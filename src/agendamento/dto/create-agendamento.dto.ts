@@ -1,7 +1,5 @@
 import { IsNotEmpty, IsEmail, IsString, IsDateString } from 'class-validator';
 
-
-
 export class CreateAgendamentoDto {
   @IsNotEmpty()
   @IsString()
@@ -16,14 +14,7 @@ export class CreateAgendamentoDto {
   pacienteTelefone: string;
 
   @IsNotEmpty()
-  @IsDateString()
-  horario: Date;
-
-  @IsNotEmpty()
   @IsString()
-  formatoConsulta: string;
+  agendamentoId: string;
 
-  @IsNotEmpty()
-  @IsString()
-  psicologoId: string;
 }

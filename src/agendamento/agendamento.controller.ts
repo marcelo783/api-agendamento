@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch } from '@nestjs/common';
 import { AgendamentoService } from './agendamento.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { Agendamento } from './agendamento.schema';
+import path from 'path';
 
 @Controller('agendamentos')
 export class AgendamentoController {
@@ -27,8 +28,8 @@ export class AgendamentoController {
     return this.agendamentoService.getDisponibilidade(psicologoId);
   }
 
-  @Post('agendar')
-  async createAgendamento(@Body() createAgendamentoDto: CreateAgendamentoDto): Promise<Agendamento> {
-    return this.agendamentoService.createAgendamento(createAgendamentoDto);
+  @Patch('agendar')
+  async createAgendamento(@Body() createAgendamentoDto: CreateAgendamentoDto): Promise<any> {
+    return this.agendamentoService.confirmarAgendamento(createAgendamentoDto);
   }
 }

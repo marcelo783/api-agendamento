@@ -1,12 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import mongoose, { Document } from 'mongoose';
 import { Psicologo } from '../psicologo/psicologo.schema';
+import { Paciente } from 'src/paciente/paciente.schema';
 
 export type AgendamentoDocument = Agendamento & Document;
 
 @Schema()
 export class Agendamento {
-  @Prop({ type: String, ref: 'Psicologo', required: true })
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'psicologo', required: true })
   psicologo: Psicologo;
 
   @Prop({ required: true })
@@ -21,6 +22,10 @@ export class Agendamento {
   @Prop({ type: String, enum: ['disponivel', 'cancelado', 'concluido', 'ausente','expirado', 'agendado'], required: true })
   status: string;
   
+  @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'Paciente', required: false })
+  paciente: Paciente;
+
+
 
   @Prop({ required: true })
   valor: number;

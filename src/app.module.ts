@@ -3,9 +3,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { PsicologoModule } from './psicologo/psicologo.module';
 import { PacienteModule } from './paciente/paciente.module';
 import { AgendamentoModule } from './agendamento/agendamento.module';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AuthModule } from './auth/auth.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
     PsicologoModule,
     PacienteModule,
     AgendamentoModule,
+    AuthModule, 
   ],
   controllers: [AppController],
   providers: [AppService],
