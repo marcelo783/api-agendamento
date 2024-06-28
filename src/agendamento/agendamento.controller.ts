@@ -9,7 +9,9 @@ export class AgendamentoController {
   constructor(private readonly agendamentoService: AgendamentoService) {}
 
   @Post()
-  async create(@Body() createAgendamentoDto: Agendamento): Promise<Agendamento> {
+  async create(
+    @Body() createAgendamentoDto: Agendamento,
+  ): Promise<Agendamento> {
     return this.agendamentoService.create(createAgendamentoDto);
   }
 
@@ -19,17 +21,31 @@ export class AgendamentoController {
   }
 
   @Get('psicologo/:id')
-  async findByPsicologo(@Param('id') psicologoId: string): Promise<Agendamento[]> {
+  async findByPsicologo(
+    @Param('id') psicologoId: string,
+  ): Promise<Agendamento[]> {
     return this.agendamentoService.findByPsicologo(psicologoId);
   }
 
   @Get('disponibilidade/:psicologoId')
-  async getDisponibilidade(@Param('psicologoId') psicologoId: string): Promise<any[]> {
+  async getDisponibilidade(
+    @Param('psicologoId') psicologoId: string,
+  ): Promise<any[]> {
     return this.agendamentoService.getDisponibilidade(psicologoId);
   }
 
   @Patch('agendar')
-  async createAgendamento(@Body() createAgendamentoDto: CreateAgendamentoDto): Promise<any> {
+  async createAgendamento(
+    @Body() createAgendamentoDto: CreateAgendamentoDto,
+  ): Promise<any> {
     return this.agendamentoService.confirmarAgendamento(createAgendamentoDto);
+  }
+
+  @Patch('atualizar/status/:status/agendamento/:agendamentoId')
+  async updateStatus(
+    @Param('status') status: string,
+    @Param('agendamentoId') agendamentoId: string
+  ): Promise<any> {
+    return this.agendamentoService.updateStatusAgendamentos(status, agendamentoId);
   }
 }

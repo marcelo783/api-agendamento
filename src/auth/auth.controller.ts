@@ -21,6 +21,6 @@ export class AuthController {
     }
     const token = await this.authService.login(user);
     console.log('Token:', token); // Adicione este log para verificar o token gerado
-    return res.redirect(`http://localhost:5000?token=${token.access_token}`);
+    return res.redirect(`http://localhost:5000?token=${token.token}`);
   }
 }

@@ -23,6 +23,7 @@ export class PsicologoService {
     return this.psicologoModel.findById(id).exec();
   }
 
+
   async update(id: string, updatePsicologoDto: CreatePsicologoDto): Promise<Psicologo> {
     const psicologo = await this.psicologoModel.findById(id).exec();
 

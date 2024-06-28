@@ -73,6 +73,7 @@ export class AgendamentoService implements OnModuleInit {
 
   async updateStatusAgendamentos(novoStatus: string, idAgendamento: string) {
     const agendamento: AgendamentoDocument = await this.findById(idAgendamento);
+    
 
     if (!agendamento) {
       throw new BadRequestException('Agendamento não encontrado');
@@ -146,6 +147,8 @@ export class AgendamentoService implements OnModuleInit {
 
     return updatedAgendamento;
 }
+
+
 
 
   private async expireOldAgendamentos() {
