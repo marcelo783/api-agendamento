@@ -6,13 +6,15 @@ import { AuthService } from "./auth.service";
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
-  constructor(private configService: ConfigService,
-    private authService: AuthService) {
+  constructor(
+    private configService: ConfigService,
+    private authService: AuthService
+  ) {
     super({
       clientID: configService.get<string>('GOOGLE_CLIENT_ID'),
       clientSecret: configService.get<string>('GOOGLE_CLIENT_SECRET'),
       callbackURL: configService.get<string>('GOOGLE_CALLBACK_URL'),
-      scope: ['email', 'profile']
+      scope: ['email', 'profile', 'https://www.googleapis.com/auth/calendar']
     });
   }
 
@@ -24,11 +26,10 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       picture: photos[0].value,
       accessToken
     };
-    
+
+    await this.authService.storeAccessToken(accessToken); // Armazena o access token do Google
     const jwt = await this.authService.login(user);
-    Logger.log(jwt)
+    Logger.log(jwt);
     done(null, { ...user, jwt });
-    
   }
-  
 }

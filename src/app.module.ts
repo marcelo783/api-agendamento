@@ -7,6 +7,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { GoogleCalendarModule } from './google-calendar/google-calendar.module';
+
+
 
 @Module({
   imports: [
@@ -20,6 +23,7 @@ import { AppService } from './app.service';
       }),
       inject: [ConfigService],
     }),
+    GoogleCalendarModule,
     PsicologoModule,
     PacienteModule,
     AgendamentoModule,

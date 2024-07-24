@@ -5,7 +5,8 @@ import { PacienteService } from './paciente.service';
 import { PacienteController } from './paciente.controller';
 
 @Module({
-  imports: [MongooseModule.forFeature([{ name: Paciente.name, schema: PacienteSchema }])],
+  imports: [MongooseModule.forFeature([{ name: Paciente.name, schema: PacienteSchema, }])],
+  
   controllers: [PacienteController],
   providers: [PacienteService],
   exports: [MongooseModule.forFeature([{ name: Paciente.name, schema: PacienteSchema }])]

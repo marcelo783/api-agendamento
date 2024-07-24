@@ -3,6 +3,7 @@ import {
   OnModuleInit,
   Logger,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -11,7 +12,8 @@ import { Paciente, PacienteDocument } from '../paciente/paciente.schema';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { addSeconds, parseISO } from 'date-fns';
 import * as cron from 'node-cron';
-
+import { CalendarService } from '../google-calendar/google-calendar.service';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class AgendamentoService implements OnModuleInit {
@@ -21,7 +23,9 @@ export class AgendamentoService implements OnModuleInit {
     @InjectModel(Agendamento.name)
     private agendamentoModel: Model<AgendamentoDocument>,
     @InjectModel(Paciente.name) private pacienteModel: Model<PacienteDocument>,
-    
+    private calendarService: CalendarService, 
+    @Inject(AuthService) // Inject using AuthService class type
+    private readonly authService: AuthService, // Maintain the same type for the property
   ) {}
 
   async onModuleInit() {
@@ -40,8 +44,6 @@ export class AgendamentoService implements OnModuleInit {
       .map((agendamento) => agendamento.disponibilidade)
       .flat();
   }
-
-
 
   async create(agendamento: Agendamento): Promise<Agendamento> {
     const createdAgendamento = new this.agendamentoModel({
@@ -96,6 +98,7 @@ export class AgendamentoService implements OnModuleInit {
   }
 
   private async createRepeatedAgendamentos(agendamento: AgendamentoDocument) {
+  
     const newDisponibilidade = agendamento.disponibilidade.map((slot) => {
       const slotDate =
         typeof slot.dia === 'string' ? parseISO(slot.dia) : slot.dia;
@@ -125,30 +128,65 @@ export class AgendamentoService implements OnModuleInit {
     await newAgendamento.save();
   }
 
-  async confirmarAgendamento(agendamento: CreateAgendamentoDto) {
-    const { agendamentoId, pacienteNome, pacienteEmail, pacienteTelefone } = agendamento;
+  
 
-    // Cria um novo paciente
-    const paciente = new this.pacienteModel({
-        nome: pacienteNome,
-        email: pacienteEmail,
-        telefone: pacienteTelefone
-    });
+ // Função confirmando o agendamento
+ 
+ async confirmarAgendamento(agendamento: CreateAgendamentoDto) {
+  const { agendamentoId, pacienteNome, pacienteEmail, pacienteTelefone } = agendamento;
 
-    // Salva o paciente e obtém o ID do documento salvo
-    const savedPaciente = await paciente.save();
-    const pacienteId = savedPaciente._id;
+  const paciente = new this.pacienteModel({
+    nome: pacienteNome,
+    email: pacienteEmail,
+    telefone: pacienteTelefone,
+  });
 
-    // Atualiza o agendamento com o ID do paciente
-    const updatedAgendamento = await this.agendamentoModel
-        
-        .findByIdAndUpdate(agendamentoId, { paciente: pacienteId, status:'agendado' }, { new: true })
-        .exec();
+  const savedPaciente = await paciente.save();
+  const pacienteId = savedPaciente._id;
 
-    return updatedAgendamento;
+  const updatedAgendamento = await this.agendamentoModel
+    .findByIdAndUpdate(agendamentoId, { paciente: pacienteId, status: 'agendado' }, { new: true })
+    .exec();
+
+  const accessToken = this.authService.getAccessToken();
+
+  const agendamentoData = {
+    titulo: updatedAgendamento.titulo,
+    descricao: updatedAgendamento.descricao,
+    start: updatedAgendamento.disponibilidade[0].horarios[0].inicio,
+    end: updatedAgendamento.disponibilidade[0].horarios[0].fim,
+    dia: updatedAgendamento.disponibilidade[0].dia,
+    pacienteEmail: savedPaciente.email,
+  };
+
+  const eventData = {
+    summary: agendamentoData.titulo,
+    description: agendamentoData.descricao,
+    start: {
+      dateTime: new Date(`${agendamentoData.dia.toISOString().split('T')[0]}T${agendamentoData.start}:00`).toISOString(),
+      timeZone: 'America/Sao_Paulo',
+    },
+    end: {
+      dateTime: new Date(`${agendamentoData.dia.toISOString().split('T')[0]}T${agendamentoData.end}:00`).toISOString(),
+      timeZone: 'America/Sao_Paulo',
+    },
+    attendees: [
+      { email: agendamentoData.pacienteEmail },
+    ],
+  };
+
+  const calendarEvent = await this.calendarService.createEvent(eventData, accessToken);
+
+  return {
+    agendamento: updatedAgendamento,
+    calendarEvent: calendarEvent,
+  };
 }
 
 
+
+
+//
 
 
   private async expireOldAgendamentos() {
