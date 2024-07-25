@@ -55,9 +55,25 @@ export class CalendarService {
     oauth2Client.setCredentials({ access_token: accessToken });
     this.calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
+//conferência do Google Meet ao criar o evento
+
+const eventWithConference = {
+  ...event,
+  conferenceData: {
+    createRequest: {
+      requestId: new Date().toISOString(), // Deve ser único para cada solicitação
+      conferenceSolutionKey: {
+        type: 'hangoutsMeet',
+      },
+    },
+  },
+};
+
+
     const res = await this.calendar.events.insert({
       calendarId: 'primary',
-      requestBody: event,
+      requestBody: eventWithConference,
+      conferenceDataVersion: 1,
     });
 
     return res.data;

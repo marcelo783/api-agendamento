@@ -9,11 +9,11 @@ export class CalendarController {
   @Get('events')
   async getEvents(@Headers('authorization') authHeader: string) {
     if (!authHeader) {
-      throw new UnauthorizedException('No authorization header provided.');
+      throw new UnauthorizedException('Nenhum header de autorização fornecido.');
     }
     const token = authHeader.split(' ')[1];
     if (!token) {
-      throw new UnauthorizedException('No access token found in authorization header.');
+      throw new UnauthorizedException('Nenhum token de acesso encontrado no header de autorização.');
     }
     return this.calendarService.listEvents(token);
   }

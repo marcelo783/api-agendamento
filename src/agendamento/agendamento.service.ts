@@ -177,6 +177,11 @@ export class AgendamentoService implements OnModuleInit {
 
   const calendarEvent = await this.calendarService.createEvent(eventData, accessToken);
 
+  const meetLink = calendarEvent.conferenceData?.entryPoints?.find(entry => entry.entryPointType === 'video')?.uri;
+
+  console.log('Google Meet Link:', meetLink);
+
+
   return {
     agendamento: updatedAgendamento,
     calendarEvent: calendarEvent,
