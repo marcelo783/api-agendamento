@@ -67,6 +67,9 @@ const eventWithConference = {
       },
     },
   },
+  attendees: [
+    { email: event.attendees[0].email } // Certifique-se de incluir os e-mails dos convidados
+  ],
 };
 
 
@@ -74,6 +77,7 @@ const eventWithConference = {
       calendarId: 'primary',
       requestBody: eventWithConference,
       conferenceDataVersion: 1,
+      sendUpdates: 'all', // Garante que e-mails de atualização sejam enviados
     });
 
     return res.data;
