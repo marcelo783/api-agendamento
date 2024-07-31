@@ -1,4 +1,30 @@
-import { IsNotEmpty, IsEmail, IsString, IsDateString } from 'class-validator';
+import { IsNotEmpty, IsEmail, IsString, IsArray, ValidateNested, IsDateString } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class HorarioDto {
+  @IsNotEmpty()
+  @IsString()
+  inicio: string;
+
+  @IsNotEmpty()
+  @IsString()
+  fim: string;
+
+  @IsNotEmpty()
+  @IsString()
+  duracao: number;
+}
+
+class DisponibilidadeDto {
+  @IsNotEmpty()
+  @IsDateString()
+  dia: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => HorarioDto)
+  horarios: HorarioDto[];
+}
 
 export class CreateAgendamentoDto {
   @IsNotEmpty()
@@ -17,4 +43,16 @@ export class CreateAgendamentoDto {
   @IsString()
   agendamentoId: string;
 
+  @IsNotEmpty()
+  @IsString()
+  titulo: string;
+
+  @IsNotEmpty()
+  @IsString()
+  descricao: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DisponibilidadeDto)
+  disponibilidade: DisponibilidadeDto[];
 }

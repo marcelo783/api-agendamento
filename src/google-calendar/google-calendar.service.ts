@@ -10,22 +10,6 @@ export class CalendarService {
     this.calendar = google.calendar({ version: 'v3' });
   }
 
-  generateAuthUrl(): string {
-    const scopes = [
-      'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/userinfo.profile',
-      'https://www.googleapis.com/auth/userinfo.email'
-    ];
-    return new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_CALLBACK_URL,
-    ).generateAuthUrl({
-      access_type: 'offline',
-      scope: scopes,
-    });
-  }
-
   async listEvents(accessToken: string): Promise<calendar_v3.Schema$Event[]> {
     if (!accessToken) {
       throw new UnauthorizedException('No access token set.');
@@ -55,23 +39,20 @@ export class CalendarService {
     oauth2Client.setCredentials({ access_token: accessToken });
     this.calendar = google.calendar({ version: 'v3', auth: oauth2Client });
 
-//conferência do Google Meet ao criar o evento
-
-const eventWithConference = {
-  ...event,
-  conferenceData: {
-    createRequest: {
-      requestId: new Date().toISOString(), // Deve ser único para cada solicitação
-      conferenceSolutionKey: {
-        type: 'hangoutsMeet',
+    const eventWithConference = {
+      ...event,
+      conferenceData: {
+        createRequest: {
+          requestId: new Date().toISOString(), // Deve ser único para cada solicitação
+          conferenceSolutionKey: {
+            type: 'hangoutsMeet',
+          },
+        },
       },
-    },
-  },
-  attendees: [
-    { email: event.attendees[0].email } // Certifique-se de incluir os e-mails dos convidados
-  ],
-};
-
+      attendees: [
+        { email: event.attendees[0].email } // Certifique-se de incluir os e-mails dos convidados
+      ],
+    };
 
     const res = await this.calendar.events.insert({
       calendarId: 'primary',
@@ -83,14 +64,38 @@ const eventWithConference = {
     return res.data;
   }
 
-  async getTokensFromCode(code: string): Promise<any> {
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_CALLBACK_URL
-    );
+  async updateEvent(eventId: string, event: calendar_v3.Schema$Event, accessToken: string): Promise<calendar_v3.Schema$Event> {
+    if (!accessToken) {
+      throw new UnauthorizedException('No access token set.');
+    }
 
-    const { tokens } = await oauth2Client.getToken(code);
-    return tokens;
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: accessToken });
+    this.calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    const res = await this.calendar.events.update({
+      calendarId: 'primary',
+      eventId: eventId,
+      requestBody: event,
+      sendUpdates: 'all',
+    });
+
+    return res.data;
+  }
+
+  async deleteEvent(eventId: string, accessToken: string): Promise<void> {
+    if (!accessToken) {
+      throw new UnauthorizedException('No access token set.');
+    }
+
+    const oauth2Client = new google.auth.OAuth2();
+    oauth2Client.setCredentials({ access_token: accessToken });
+    this.calendar = google.calendar({ version: 'v3', auth: oauth2Client });
+
+    await this.calendar.events.delete({
+      calendarId: 'primary',
+      eventId: eventId,
+      sendUpdates: 'all',
+    });
   }
 }

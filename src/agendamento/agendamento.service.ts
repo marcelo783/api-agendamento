@@ -135,21 +135,26 @@ export class AgendamentoService implements OnModuleInit {
  async confirmarAgendamento(agendamento: CreateAgendamentoDto) {
   const { agendamentoId, pacienteNome, pacienteEmail, pacienteTelefone } = agendamento;
 
+  // Cria um novo documento de paciente
   const paciente = new this.pacienteModel({
     nome: pacienteNome,
     email: pacienteEmail,
     telefone: pacienteTelefone,
   });
 
+  // Salva o paciente no banco de dados
   const savedPaciente = await paciente.save();
   const pacienteId = savedPaciente._id;
 
+ // Atualiza o agendamento com as informações do paciente 
   const updatedAgendamento = await this.agendamentoModel
     .findByIdAndUpdate(agendamentoId, { paciente: pacienteId, status: 'agendado' }, { new: true })
     .exec();
 
+    // Obtém o token de acesso do Google
   const accessToken = this.authService.getAccessToken();
 
+  // Prepara os dados do agendamento para o Google Calendar
   const agendamentoData = {
     titulo: updatedAgendamento.titulo,
     descricao: updatedAgendamento.descricao,
@@ -175,11 +180,19 @@ export class AgendamentoService implements OnModuleInit {
     ],
   };
 
+  // Cria o evento no Google Calendar
   const calendarEvent = await this.calendarService.createEvent(eventData, accessToken);
 
+   // Obtém o link do Google Meet, se disponível
   const meetLink = calendarEvent.conferenceData?.entryPoints?.find(entry => entry.entryPointType === 'video')?.uri;
 
   console.log('Google Meet Link:', meetLink);
+
+  
+
+// Atualizar o agendamento com o ID do Google Calendar
+  updatedAgendamento.googleCalendarId = calendarEvent.id;
+  await updatedAgendamento.save();
 
 
   return {
@@ -188,12 +201,69 @@ export class AgendamentoService implements OnModuleInit {
   };
 }
 
+async atualizarAgendamento(googleCalendarId: string, backendId: string, updateData: CreateAgendamentoDto, accessToken: string) {
+  const { titulo, descricao, disponibilidade, pacienteEmail } = updateData;
+
+  const agendamento = await this.agendamentoModel.findById(backendId).exec();
+    if (!agendamento) {
+      throw new Error('Agendamento não encontrado');
+    }
+
+  // Atualizar evento no Google Calendar
+  const eventData = {
+    summary: titulo,
+    description: descricao,
+    start: {
+      dateTime: new Date(`${disponibilidade[0].dia}T${disponibilidade[0].horarios[0].inicio}:00`).toISOString(),
+      timeZone: 'America/Sao_Paulo',
+    },
+    end: {
+      dateTime: new Date(`${disponibilidade[0].dia}T${disponibilidade[0].horarios[0].fim}:00`).toISOString(),
+      timeZone: 'America/Sao_Paulo',
+    },
+    attendees: [
+      { email: pacienteEmail },
+    ],
+  };
+
+  const updatedCalendarEvent = await this.calendarService.updateEvent(googleCalendarId, eventData, accessToken);
+
+  
+
+  // Atualizar agendamento no backend
+  agendamento.titulo = titulo;
+  agendamento.descricao = descricao;
+  agendamento.disponibilidade = disponibilidade.map(d => ({
+    dia: new Date(d.dia),
+    horarios: d.horarios
+  }));
+  await agendamento.save();
+
+  return {
+    agendamento,
+    updatedCalendarEvent,
+  };
+}
+
+async deletarAgendamento(googleCalendarId: string, backendId: string, accessToken: string) {
+
+  const agendamento = await this.agendamentoModel.findById(backendId).exec();
+  if (!agendamento) {
+    throw new Error('Agendamento não encontrado');
+  }
+
+  // Deletar evento no Google Calendar
+  await this.calendarService.deleteEvent(googleCalendarId, accessToken);
+
+  // Deletar agendamento no backend
+  await this.agendamentoModel.findByIdAndDelete(agendamento._id).exec();
+
+  return { message: 'Agendamento deletado com sucesso' };
+}
 
 
 
 //
-
-
   private async expireOldAgendamentos() {
     const now = new Date();
     const agendamentos = await this.agendamentoModel

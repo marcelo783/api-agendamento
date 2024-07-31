@@ -1,15 +1,11 @@
 import { Controller, Get, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
-import { CalendarService } from '../google-calendar/google-calendar.service';
 import { Request, Response } from 'express';
 
 @Controller('auth')
 export class AuthController {
-  constructor(
-    private readonly authService: AuthService,
-    private readonly calendarService: CalendarService
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Get('google')
   @UseGuards(AuthGuard('google'))
@@ -19,8 +15,8 @@ export class AuthController {
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Query('code') code: string, @Req() req: Request, @Res() res: Response) {
     try {
-      const tokens = await this.calendarService.getTokensFromCode(code);
-      this.authService.storeAccessToken(tokens.access_token);
+      const tokens = await this.authService.getTokensFromCode(code);
+      console.log('Tokens obtidos:', tokens);
       const token = await this.authService.login({ ...req.user, ...tokens });
       return res.redirect(`http://localhost:5000?token=${token.token}`);
     } catch (error) {

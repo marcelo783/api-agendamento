@@ -53,6 +53,8 @@ export class Agendamento {
       duracao: number;
     }>
   }>;
+  @Prop({ type: String, required: false }) // Adicione esta linha
+  googleCalendarId: string;
 }
 
 export const AgendamentoSchema = SchemaFactory.createForClass(Agendamento);

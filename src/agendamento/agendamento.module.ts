@@ -1,5 +1,5 @@
 // agendamento.module.ts
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AgendamentoService } from './agendamento.service';
 import { AgendamentoController } from './agendamento.controller';
@@ -12,11 +12,12 @@ import { AuthModule } from '../auth/auth.module'; // Import AuthModule to make J
   imports: [
     MongooseModule.forFeature([{ name: Agendamento.name, schema: AgendamentoSchema }]),
     PacienteModule,
-    GoogleCalendarModule,
+    forwardRef(() => GoogleCalendarModule),
     AuthModule, // Import AuthModule to make JwtService available
   ],
 
   controllers: [AgendamentoController],
-  providers: [AgendamentoService]
+  providers: [AgendamentoService],
+  exports: [AgendamentoService]
 })
 export class AgendamentoModule {}
