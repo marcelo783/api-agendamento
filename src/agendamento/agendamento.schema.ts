@@ -10,6 +10,9 @@ export class Agendamento {
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'psicologo', required: true })
   psicologo: Psicologo;
 
+  @Prop({ required: false })
+  googleCalendarId: string
+
   @Prop({ required: true })
   titulo: string;
 
@@ -53,8 +56,7 @@ export class Agendamento {
       duracao: number;
     }>
   }>;
-  @Prop({ type: String, required: false }) // Adicione esta linha
-  googleCalendarId: string;
+  
 }
 
 export const AgendamentoSchema = SchemaFactory.createForClass(Agendamento);

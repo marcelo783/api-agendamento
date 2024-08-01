@@ -201,10 +201,10 @@ export class AgendamentoService implements OnModuleInit {
   };
 }
 
-async atualizarAgendamento(googleCalendarId: string, backendId: string, updateData: CreateAgendamentoDto, accessToken: string) {
+async atualizarAgendamento(googleCalendarId: string , updateData: CreateAgendamentoDto, accessToken: string) {
   const { titulo, descricao, disponibilidade, pacienteEmail } = updateData;
 
-  const agendamento = await this.agendamentoModel.findById(backendId).exec();
+  const agendamento = await this.agendamentoModel.findOne({ googleCalendarId }).exec();
     if (!agendamento) {
       throw new Error('Agendamento não encontrado');
     }
@@ -245,18 +245,17 @@ async atualizarAgendamento(googleCalendarId: string, backendId: string, updateDa
   };
 }
 
-async deletarAgendamento(googleCalendarId: string, backendId: string, accessToken: string) {
-
-  const agendamento = await this.agendamentoModel.findById(backendId).exec();
-  if (!agendamento) {
-    throw new Error('Agendamento não encontrado');
-  }
-
+async deletarAgendamento(googleCalendarId: string, accessToken: string) {
   // Deletar evento no Google Calendar
   await this.calendarService.deleteEvent(googleCalendarId, accessToken);
 
   // Deletar agendamento no backend
-  await this.agendamentoModel.findByIdAndDelete(agendamento._id).exec();
+  const agendamento = await this.agendamentoModel.findOne({ googleCalendarId }).exec();
+  if (!agendamento) {
+    throw new Error('Agendamento não encontrado');
+  }
+
+  await this.agendamentoModel.findOneAndDelete({ googleCalendarId }).exec();
 
   return { message: 'Agendamento deletado com sucesso' };
 }

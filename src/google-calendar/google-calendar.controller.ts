@@ -23,21 +23,20 @@ export class CalendarController {
     return this.calendarService.createEvent(event, token);
   }
 
-  @Put('event/:googleCalendarId/:backendId')
+  @Put('event/:id')
   async updateEvent(
     @Headers('authorization') authHeader: string,
-    @Param('googleCalendarId') googleCalendarId: string,
-    @Param('backendId') backendId: string,
+    @Param('id') googleCalendarId: string,
     @Body() updateData: CreateAgendamentoDto
   ) {
     const token = this.extractToken(authHeader);
-    return this.agendamentoService.atualizarAgendamento(googleCalendarId, backendId, updateData, token);
+    return this.agendamentoService.atualizarAgendamento(googleCalendarId, updateData, token);
   }
 
-  @Delete('event/:googleCalendarId/:backendId')
-  async deleteEvent(@Headers('authorization') authHeader: string, @Param('googleCalendarId') googleCalendarId: string, @Param('backendId') backendId: string) {
+  @Delete('event/:id')
+  async deleteEvent(@Headers('authorization') authHeader: string, @Param('id') googleCalendarId: string) {
     const token = this.extractToken(authHeader);
-    return this.agendamentoService.deletarAgendamento(googleCalendarId, backendId, token);
+    return this.agendamentoService.deletarAgendamento(googleCalendarId, token);
   }
 
   private extractToken(authHeader: string): string {
