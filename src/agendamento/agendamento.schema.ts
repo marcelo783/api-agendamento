@@ -19,7 +19,7 @@ export class Agendamento {
   @Prop({ required: true })
   descricao: string;
 
-  @Prop({ type: String, enum: ['online', 'presencial', 'hibrido'], required: true })
+  @Prop({ type: String, enum: ['online', 'presencial'], required: true })
   formatoConsulta: string;
 
   @Prop({ type: String, enum: ['disponivel', 'cancelado', 'concluido', 'ausente','expirado', 'agendado'], required: true })
