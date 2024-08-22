@@ -1,4 +1,4 @@
-// src/psicologo/dto/create-psicologo.dto.ts
+
 import { IsString, IsEmail, IsNotEmpty } from 'class-validator';
 
 export class CreatePsicologoDto {

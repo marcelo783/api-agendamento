@@ -7,6 +7,8 @@ export class AppService {
     if (!req.user) {
       return res.status(401).json({ message: 'Nenhum usuário do Google' });
     }
+    console.log(req.user);
+    
 
     // Configurar o cookie
     res.cookie('authToken', req.user.jwt.token, {

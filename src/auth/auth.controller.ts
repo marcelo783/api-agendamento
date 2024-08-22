@@ -14,21 +14,27 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req, @Res() res: Response) {
+    const user = req.user;
     try {
-      const token = await this.authService.login(req.user);
+      const isRegistered = await this.authService.isUserRegistered(user.email);
+
+      if (!isRegistered) {
+        // Redireciona para o registro se o usuário não estiver registrado
+        return res.redirect('http://localhost:5173/register');
+      }
+
+      const token = await this.authService.login(user);
 
       // Define o cookie com o token JWT
       res.cookie('authToken', token.token, {
-        httpOnly: false,
+        httpOnly: true,
         secure: false,
         sameSite: 'lax',
         maxAge: 3600000, // 1 hora
       });
 
-      
-      console.log('Redirecionando para o frontend...');
-      // Redireciona para a página de registro
-     return res.redirect('http://localhost:5173/register');
+      // Redireciona para a página de administração
+      return res.redirect('http://localhost:5173/adm');
     } catch (error) {
       console.error('Erro ao redirecionar após o login com Google:', error);
       return res.redirect('http://localhost:5173/error');
