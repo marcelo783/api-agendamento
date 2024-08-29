@@ -39,9 +39,16 @@ export class AuthService {
     const psicologo = await this.psicologoModel.findOne({ email: user.email });
 
     if (!psicologo) {
-      throw new Error('Psicólogo não registrado.');
+      // O usuário não está registrado. Gera um token JWT com um sub temporário
+      const payload = {
+        email: user.email,
+        sub: 'tempId' // Usado apenas como valor temporário
+      };
+      const token = this.jwtService.sign(payload);
+      return { isRegistered: false, token };
     }
 
+    // O usuário está registrado. Gera um token JWT com o ID real do psicólogo
     const payload = {
       email: psicologo.email,
       nome: psicologo.nome,
@@ -49,9 +56,11 @@ export class AuthService {
       registroProfissional: psicologo.registroProfissional,
       sub: psicologo._id,
     };
+    const token = this.jwtService.sign(payload);
 
     return {
-      token: this.jwtService.sign(payload),
+      isRegistered: true,
+      token,
     };
   }
 

@@ -11,6 +11,7 @@ import { GoogleCalendarModule } from './google-calendar/google-calendar.module';
 
 
 
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -27,6 +28,7 @@ import { GoogleCalendarModule } from './google-calendar/google-calendar.module';
     PsicologoModule,
     PacienteModule,
     AgendamentoModule,
+  
     AuthModule, 
   ],
   controllers: [AppController],

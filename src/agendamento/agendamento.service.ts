@@ -49,6 +49,7 @@ export class AgendamentoService implements OnModuleInit {
     const createdAgendamento = new this.agendamentoModel({
       ...agendamento,
       status: 'disponivel',
+      
     });
    
 

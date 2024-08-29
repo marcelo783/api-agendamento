@@ -1,16 +1,19 @@
-import { Controller, Get, Post, Body, Param, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, UseGuards, Req } from '@nestjs/common';
 import { AgendamentoService } from './agendamento.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { Agendamento } from './agendamento.schema';
 import path from 'path';
 
+
 @Controller('agendamentos')
 export class AgendamentoController {
   constructor(private readonly agendamentoService: AgendamentoService) {}
 
+
   @Post()
   async create(
     @Body() createAgendamentoDto: Agendamento,
+   
   ): Promise<Agendamento> {
     return this.agendamentoService.create(createAgendamentoDto);
   }
