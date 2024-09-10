@@ -261,6 +261,34 @@ async deletarAgendamento(googleCalendarId: string, accessToken: string) {
   return { message: 'Agendamento deletado com sucesso' };
 }
 
+// Filtrar agendamentos por título e/ou data
+async findAllWithFilters(titulo?: string, data?: string): Promise<Agendamento[]> {
+  const filter: any = {};
+
+  // Filtro de título
+  if (titulo) {
+    filter.titulo = { $regex: titulo, $options: 'i' };
+  }
+
+  // Filtro de data como intervalo (do início ao fim do dia)
+  if (data) {
+    const startDate = new Date(data);
+    startDate.setUTCHours(0, 0, 0, 0); // Início do dia (meia-noite UTC)
+    
+    const endDate = new Date(data);
+    endDate.setUTCHours(23, 59, 59, 999); // Fim do dia (23:59:59 UTC)
+    
+    filter['disponibilidade.dia'] = {
+      $gte: startDate,
+      $lte: endDate,
+    };
+  }
+
+  return this.agendamentoModel.find(filter).exec();
+}
+
+
+
 
 
 //

@@ -38,6 +38,9 @@ export class AuthService {
   async login(user: any) {
     const psicologo = await this.psicologoModel.findOne({ email: user.email });
 
+    // Obtenha o accessToken armazenado previamente
+    const accessToken = this.getAccessToken();
+
     if (!psicologo) {
       // O usuário não está registrado. Gera um token JWT com um sub temporário
       const payload = {
@@ -45,7 +48,7 @@ export class AuthService {
         sub: 'tempId' // Usado apenas como valor temporário
       };
       const token = this.jwtService.sign(payload);
-      return { isRegistered: false, token };
+      return { isRegistered: false, token, accessToken }; // Inclua o accessToken no retorno
     }
 
     // O usuário está registrado. Gera um token JWT com o ID real do psicólogo
@@ -61,6 +64,7 @@ export class AuthService {
     return {
       isRegistered: true,
       token,
+      accessToken, // Inclua o accessToken no retorno
     };
   }
 

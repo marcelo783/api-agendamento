@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Patch, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, UseGuards, Req, Query } from '@nestjs/common';
 import { AgendamentoService } from './agendamento.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { Agendamento } from './agendamento.schema';
@@ -18,10 +18,21 @@ export class AgendamentoController {
     return this.agendamentoService.create(createAgendamentoDto);
   }
 
+  //@Get()
+  //async findAll(): Promise<Agendamento[]> {
+    //return this.agendamentoService.findAll();
+  //}
+
+  // Endpoint para listar todos os agendamentos com filtros
   @Get()
-  async findAll(): Promise<Agendamento[]> {
-    return this.agendamentoService.findAll();
+  async findAll(
+    @Query('titulo') titulo: string, // Filtro por título (opcional)
+    @Query('data') data: string,     // Filtro por data (opcional)
+  ): Promise<Agendamento[]> {
+    return this.agendamentoService.findAllWithFilters(titulo, data);
   }
+
+  
 
   @Get('psicologo/:id')
   async findByPsicologo(

@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Param, Put, Delete } from '@nestjs/common';
 import { PacienteService } from './paciente.service';
 import { CreatePacienteDto } from './dto/creat-paciente.dto';
+import { Paciente } from './paciente.schema';
 
 @Controller('pacientes')
 export class PacienteController {
@@ -16,10 +17,13 @@ export class PacienteController {
     return this.pacienteService.findAll();
   }
 
+  // Endpoint para buscar um paciente pelo ID
   @Get(':id')
-  findOne(@Param('id') id: string) {
+  async findOne(@Param('id') id: string): Promise<Paciente> {
     return this.pacienteService.findOne(id);
   }
+
+ 
 
   @Put(':id')
   update(@Param('id') id: string, @Body() updatePacienteDto: CreatePacienteDto) {
