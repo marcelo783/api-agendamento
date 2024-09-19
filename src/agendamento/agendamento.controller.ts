@@ -62,4 +62,28 @@ export class AgendamentoController {
   ): Promise<any> {
     return this.agendamentoService.updateStatusAgendamentos(status, agendamentoId);
   }
+
+
+  //atualizar agendamento no calendar e no banco
+
+  @Patch('atualizar/:googleCalendarId')
+async atualizarAgendamento(
+  @Param('googleCalendarId') googleCalendarId: string,
+  @Body() updateAgendamentoDto: CreateAgendamentoDto,
+  @Req() req: any // Aqui você pode capturar o token de autenticação se necessário
+): Promise<any> {
+  const accessToken = req.cookies?.accessToken; // Captura o accessToken do cookie ou header
+  if (!accessToken) {
+    throw new Error('Token de autenticação não encontrado');
+  }
+  
+  return this.agendamentoService.atualizarAgendamento(googleCalendarId, updateAgendamentoDto, accessToken);
+}
+
+@Get('googleCalendar/:googleCalendarId')
+async findByGoogleCalendarId(
+  @Param('googleCalendarId') googleCalendarId: string,
+): Promise<Agendamento> {
+  return this.agendamentoService.findByGoogleCalendarId(googleCalendarId);
+}
 }

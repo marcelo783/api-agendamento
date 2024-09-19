@@ -4,6 +4,7 @@ import {
   Logger,
   BadRequestException,
   Inject,
+  NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -130,7 +131,15 @@ export class AgendamentoService implements OnModuleInit {
   }
 
   
-
+  async findByGoogleCalendarId(googleCalendarId: string): Promise<Agendamento> {
+    const agendamento = await this.agendamentoModel.findOne({ googleCalendarId }).exec();
+    if (!agendamento) {
+      throw new NotFoundException(`Agendamento com googleCalendarId ${googleCalendarId} não encontrado`);
+    }
+    return agendamento;
+  }
+  
+  
  // Função confirmando o agendamento
  
  async confirmarAgendamento(agendamento: CreateAgendamentoDto) {
