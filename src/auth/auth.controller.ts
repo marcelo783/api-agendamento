@@ -28,7 +28,7 @@ export class AuthController {
     });
   
     res.cookie('accessToken', loginResult.accessToken, {
-      httpOnly: true,
+      httpOnly: false,
       secure: false, // Defina como true em produção
       sameSite: 'lax',
       maxAge: 3600000, // 1 hora

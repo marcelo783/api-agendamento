@@ -18,11 +18,13 @@ export class AppService {
       maxAge: 3600000, // 1 hora
     });
 
-    res.cookie('accessToken', req.user.accessToken, {
-      httpOnly: true,
-      secure: false, // Defina como true em produção
+    
+    
+    res.cookie('accessToken', req.user.accessToken, { 
+      httpOnly: false,  
+      secure: false,
       sameSite: 'lax',
-      maxAge: 3600000, // 1 hora
+      maxAge: 3600000, 
     });
   
 

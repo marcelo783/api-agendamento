@@ -211,24 +211,33 @@ export class AgendamentoService implements OnModuleInit {
   };
 }
 
-async atualizarAgendamento(googleCalendarId: string , updateData: CreateAgendamentoDto, accessToken: string) {
+async atualizarAgendamento(googleCalendarId: string, updateData: CreateAgendamentoDto, accessToken: string) {
   const { titulo, descricao, disponibilidade, pacienteEmail } = updateData;
 
   const agendamento = await this.agendamentoModel.findOne({ googleCalendarId }).exec();
-    if (!agendamento) {
-      throw new Error('Agendamento não encontrado');
-    }
+  if (!agendamento) {
+    throw new Error('Agendamento não encontrado');
+  }
+
+  // Verifique se as datas e horários estão corretos
+  const startDateTime = new Date(`${disponibilidade[0].dia}T${disponibilidade[0].horarios[0].inicio}:00`);
+  const endDateTime = new Date(`${disponibilidade[0].dia}T${disponibilidade[0].horarios[0].fim}:00`);
+
+  // Se a data ou o horário for inválido, lançará um erro
+  if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
+    throw new Error(`Data ou hora inválida. Verifique o formato das datas e horários. Recebido: ${disponibilidade[0].dia}, Início: ${disponibilidade[0].horarios[0].inicio}, Fim: ${disponibilidade[0].horarios[0].fim}`);
+  }
 
   // Atualizar evento no Google Calendar
   const eventData = {
     summary: titulo,
     description: descricao,
     start: {
-      dateTime: new Date(`${disponibilidade[0].dia}T${disponibilidade[0].horarios[0].inicio}:00`).toISOString(),
+      dateTime: startDateTime.toISOString(),
       timeZone: 'America/Sao_Paulo',
     },
     end: {
-      dateTime: new Date(`${disponibilidade[0].dia}T${disponibilidade[0].horarios[0].fim}:00`).toISOString(),
+      dateTime: endDateTime.toISOString(),
       timeZone: 'America/Sao_Paulo',
     },
     attendees: [
@@ -237,8 +246,6 @@ async atualizarAgendamento(googleCalendarId: string , updateData: CreateAgendame
   };
 
   const updatedCalendarEvent = await this.calendarService.updateEvent(googleCalendarId, eventData, accessToken);
-
-  
 
   // Atualizar agendamento no backend
   agendamento.titulo = titulo;
@@ -254,6 +261,8 @@ async atualizarAgendamento(googleCalendarId: string , updateData: CreateAgendame
     updatedCalendarEvent,
   };
 }
+
+
 
 async deletarAgendamento(googleCalendarId: string, accessToken: string) {
   // Deletar evento no Google Calendar

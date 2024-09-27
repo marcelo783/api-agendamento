@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Patch, UseGuards, Req, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, UseGuards, Req, Query, Put } from '@nestjs/common';
 import { AgendamentoService } from './agendamento.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { Agendamento } from './agendamento.schema';
@@ -66,19 +66,18 @@ export class AgendamentoController {
 
   //atualizar agendamento no calendar e no banco
 
-  @Patch('atualizar/:googleCalendarId')
-async atualizarAgendamento(
-  @Param('googleCalendarId') googleCalendarId: string,
-  @Body() updateAgendamentoDto: CreateAgendamentoDto,
-  @Req() req: any // Aqui você pode capturar o token de autenticação se necessário
-): Promise<any> {
-  const accessToken = req.cookies?.accessToken; // Captura o accessToken do cookie ou header
-  if (!accessToken) {
-    throw new Error('Token de autenticação não encontrado');
+  @Put('calendar/event/:googleCalendarId')
+  async updateEvent(
+    @Param('googleCalendarId') googleCalendarId: string,
+    @Body() updateData: CreateAgendamentoDto,  // Atualiza o Google Calendar e o Banco de Dados
+    @Req() req: any  // Para capturar o accessToken
+  ) {
+    const accessToken = req.headers.authorization.split(' ')[1];  // Captura o accessToken do header
+    return this.agendamentoService.atualizarAgendamento(googleCalendarId, updateData, accessToken);
   }
   
-  return this.agendamentoService.atualizarAgendamento(googleCalendarId, updateAgendamentoDto, accessToken);
-}
+  
+  
 
 @Get('googleCalendar/:googleCalendarId')
 async findByGoogleCalendarId(
