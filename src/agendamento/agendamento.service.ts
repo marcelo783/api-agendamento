@@ -264,6 +264,31 @@ async atualizarAgendamento(googleCalendarId: string, updateData: CreateAgendamen
 
 
 
+// Atualizar agendamento por _id (sem Google Calendar)
+async atualizarAgendamentoPorId(id: string, updateData: CreateAgendamentoDto) {
+  // Atualizar agendamento no backend
+  const agendamento = await this.agendamentoModel.findById(id).exec();
+  if (!agendamento) {
+    throw new NotFoundException('Agendamento não encontrado');
+  }
+
+  agendamento.titulo = updateData.titulo;
+  agendamento.descricao = updateData.descricao;
+  //agendamento.pacienteEmail = updateData.pacienteEmail;
+  //agendamento.formatoConsulta = updateData.formatoConsulta;
+ // agendamento.valor = updateData.valor;
+  agendamento.disponibilidade = updateData.disponibilidade.map(d => ({
+    dia: new Date(d.dia),
+    horarios: d.horarios,
+  }));
+
+  await agendamento.save();
+
+  return { message: 'Agendamento atualizado com sucesso', agendamento };
+}
+
+
+
 async deletarAgendamento(googleCalendarId: string, accessToken: string) {
   // Deletar evento no Google Calendar
   await this.calendarService.deleteEvent(googleCalendarId, accessToken);
@@ -278,6 +303,22 @@ async deletarAgendamento(googleCalendarId: string, accessToken: string) {
 
   return { message: 'Agendamento deletado com sucesso' };
 }
+
+// deletar por id
+
+async deletarAgendamentoPorId(id: string) {
+  const agendamento = await this.agendamentoModel.findById(id).exec();
+  if (!agendamento) {
+    throw new NotFoundException('Agendamento não encontrado');
+  }
+
+  // Deletar agendamento no backend (não toca no Google Calendar)
+  await this.agendamentoModel.findByIdAndDelete(id).exec();
+
+  return { message: 'Agendamento deletado com sucesso' };
+}
+
+
 
 // Filtrar agendamentos por título e/ou data
 async findAllWithFilters(titulo?: string, data?: string): Promise<Agendamento[]> {
@@ -304,8 +345,6 @@ async findAllWithFilters(titulo?: string, data?: string): Promise<Agendamento[]>
 
   return this.agendamentoModel.find(filter).exec();
 }
-
-
 
 
 

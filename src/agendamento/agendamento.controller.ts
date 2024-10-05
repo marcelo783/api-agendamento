@@ -1,13 +1,23 @@
-import { Controller, Get, Post, Body, Param, Patch, UseGuards, Req, Query, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Patch, UseGuards, Req, Query, Put, Delete, UnauthorizedException, Headers } from '@nestjs/common';
 import { AgendamentoService } from './agendamento.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { Agendamento } from './agendamento.schema';
 import path from 'path';
+import { AuthGuard } from '@nestjs/passport';
 
 
 @Controller('agendamentos')
 export class AgendamentoController {
   constructor(private readonly agendamentoService: AgendamentoService) {}
+
+
+  @Get(':id')
+async findById(
+  @Param('id') id: string,
+): Promise<Agendamento> {
+  return this.agendamentoService.findById(id);
+}
+
 
 
   @Post()
@@ -31,6 +41,41 @@ export class AgendamentoController {
   ): Promise<Agendamento[]> {
     return this.agendamentoService.findAllWithFilters(titulo, data);
   }
+
+
+  //deletar pelo _id do evento
+  @Delete(':id')
+//@UseGuards(AuthGuard('jwt')) // Protege a rota com autenticação JWT
+async deletarAgendamentoPorId(
+  @Param('id') id: string,
+  @Req() req: any,
+) {
+  const token = req.cookies?.authToken || req.headers.authorization?.split(' ')[1];
+  if (!token) {
+    throw new Error('Token de autenticação não encontrado');
+  }
+
+  return this.agendamentoService.deletarAgendamentoPorId(id);
+}
+
+
+
+@Delete(':googleCalendarId')
+  //@UseGuards(AuthGuard('jwt')) // Protegendo a rota com JWT AuthGuard
+  async deletarAgendamento(
+    @Param('googleCalendarId') googleCalendarId: string,
+    @Headers('authorization') authorization: string,
+  ) {
+    // Extrair o token do header
+    const accessToken = authorization?.split(' ')[1];
+    if (!accessToken) {
+      throw new Error('Token de autenticação não encontrado');
+    }
+
+    // Chamando o serviço para deletar o agendamento
+    return this.agendamentoService.deletarAgendamento(googleCalendarId, accessToken);
+  }
+  
 
   
 
@@ -76,6 +121,21 @@ export class AgendamentoController {
     return this.agendamentoService.atualizarAgendamento(googleCalendarId, updateData, accessToken);
   }
   
+
+  @Patch(':id')
+async atualizarAgendamentoPorId(
+  @Param('id') id: string,
+  @Body() updateAgendamentoDto: CreateAgendamentoDto,
+  @Req() req: any,
+) {
+  const accessToken = req.cookies?.authToken || req.headers.authorization?.split(' ')[1];
+  if (!accessToken) {
+    throw new Error('Token de autenticação não encontrado');
+  }
+
+  return this.agendamentoService.atualizarAgendamentoPorId(id, updateAgendamentoDto);
+}
+
   
   
 
