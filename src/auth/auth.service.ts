@@ -45,26 +45,30 @@ export class AuthService {
       // O usuário não está registrado. Gera um token JWT com um sub temporário
       const payload = {
         email: user.email,
-        sub: 'tempId' // Usado apenas como valor temporário
+        sub: 'tempId',
+        firstName: user.firstName,
+        picture: user.picture, 
       };
       const token = this.jwtService.sign(payload);
-      return { isRegistered: false, token, accessToken }; // Inclua o accessToken no retorno
+      return { isRegistered: false, token, accessToken }; 
     }
 
-    // O usuário está registrado. Gera um token JWT com o ID real do psicólogo
+    
     const payload = {
       email: psicologo.email,
       nome: psicologo.nome,
       especialidade: psicologo.especialidade,
       registroProfissional: psicologo.registroProfissional,
       sub: psicologo._id,
+      firstName: user.firstName, 
+      picture: user.picture,
     };
     const token = this.jwtService.sign(payload);
 
     return {
       isRegistered: true,
       token,
-      accessToken, // Inclua o accessToken no retorno
+      accessToken, 
     };
   }
 

@@ -7,6 +7,9 @@ import { Request, Response } from 'express';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+
+  
+  
   @Get('google')
   @UseGuards(AuthGuard('google'))
   async googleAuth(@Req() req) {}
@@ -21,7 +24,7 @@ export class AuthController {
   
     // Definindo o token JWT e o accessToken no cookie
     res.cookie('authToken', loginResult.token, {
-      httpOnly: true,
+      httpOnly: false,
       secure: false, // Defina como true em produção
       sameSite: 'lax',
       maxAge: 3600000, // 1 hora

@@ -212,7 +212,7 @@ export class AgendamentoService implements OnModuleInit {
 }
 
 async atualizarAgendamento(googleCalendarId: string, updateData: CreateAgendamentoDto, accessToken: string) {
-  const { titulo, descricao, disponibilidade, pacienteEmail } = updateData;
+  const { titulo, descricao, disponibilidade, status, formatoConsulta, pacienteEmail } = updateData;
 
   const agendamento = await this.agendamentoModel.findOne({ googleCalendarId }).exec();
   if (!agendamento) {
@@ -220,13 +220,24 @@ async atualizarAgendamento(googleCalendarId: string, updateData: CreateAgendamen
   }
 
   // Verifique se as datas e horários estão corretos
-  const startDateTime = new Date(`${disponibilidade[0].dia}T${disponibilidade[0].horarios[0].inicio}:00`);
-  const endDateTime = new Date(`${disponibilidade[0].dia}T${disponibilidade[0].horarios[0].fim}:00`);
+  const dia = new Date(disponibilidade[0].dia).toISOString().split('T')[0]; // Garante 'YYYY-MM-DD'
 
-  // Se a data ou o horário for inválido, lançará um erro
-  if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
-    throw new Error(`Data ou hora inválida. Verifique o formato das datas e horários. Recebido: ${disponibilidade[0].dia}, Início: ${disponibilidade[0].horarios[0].inicio}, Fim: ${disponibilidade[0].horarios[0].fim}`);
+  const startDateTime = new Date(`${dia}T${disponibilidade[0].horarios[0].inicio}:00`);
+  const endDateTime = new Date(`${dia}T${disponibilidade[0].horarios[0].fim}:00`);
+
+  // **Valide o formato das horas:**
+  const isValidHourFormat = (time: string) => /^\d{2}:\d{2}$/.test(time);
+
+  if (!isValidHourFormat(disponibilidade[0].horarios[0].inicio) || !isValidHourFormat(disponibilidade[0].horarios[0].fim)) {
+    throw new Error(`Formato de hora inválido. Início: ${disponibilidade[0].horarios[0].inicio}, Fim: ${disponibilidade[0].horarios[0].fim}`);
   }
+
+  // **Verifique se as datas são válidas:**
+  if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
+    throw new Error(`Data ou hora inválida. Verifique o formato das datas e horários. Recebido: ${dia}, Início: ${disponibilidade[0].horarios[0].inicio}, Fim: ${disponibilidade[0].horarios[0].fim}`);
+  }
+
+  
 
   // Atualizar evento no Google Calendar
   const eventData = {
@@ -250,6 +261,8 @@ async atualizarAgendamento(googleCalendarId: string, updateData: CreateAgendamen
   // Atualizar agendamento no backend
   agendamento.titulo = titulo;
   agendamento.descricao = descricao;
+  agendamento.status = status;
+  agendamento.formatoConsulta = formatoConsulta;
   agendamento.disponibilidade = disponibilidade.map(d => ({
     dia: new Date(d.dia),
     horarios: d.horarios
@@ -274,6 +287,11 @@ async atualizarAgendamentoPorId(id: string, updateData: CreateAgendamentoDto) {
 
   agendamento.titulo = updateData.titulo;
   agendamento.descricao = updateData.descricao;
+  agendamento.status = updateData.status;
+  agendamento.formatoConsulta = updateData.formatoConsulta;
+
+
+  
   //agendamento.pacienteEmail = updateData.pacienteEmail;
   //agendamento.formatoConsulta = updateData.formatoConsulta;
  // agendamento.valor = updateData.valor;

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, Patch } from '@nestjs/common';
 import { PsicologoService } from './psicologo.service';
 import { CreatePsicologoDto } from './dto/creat-psicologo.dto';
 
@@ -21,7 +21,7 @@ export class PsicologoController {
     return this.psicologoService.findOne(id);
   }
 
-  @Put(':id')
+  @Patch(':id')
   update(@Param('id') id: string, @Body() updatePsicologoDto: CreatePsicologoDto) {
     return this.psicologoService.update(id, updatePsicologoDto);
   }

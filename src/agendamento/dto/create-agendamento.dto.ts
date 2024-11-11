@@ -51,6 +51,16 @@ export class CreateAgendamentoDto {
   @IsString()
   descricao: string;
 
+  @IsNotEmpty()
+  @IsString()
+  status: string;
+
+  @IsNotEmpty()
+  @IsString()
+  formatoConsulta: string;
+
+  
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => DisponibilidadeDto)
