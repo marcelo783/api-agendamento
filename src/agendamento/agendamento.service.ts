@@ -158,7 +158,7 @@ export class AgendamentoService implements OnModuleInit {
 
  // Atualiza o agendamento com as informações do paciente 
   const updatedAgendamento = await this.agendamentoModel
-    .findByIdAndUpdate(agendamentoId, { paciente: pacienteId, status: 'agendado' }, { new: true })
+    .findByIdAndUpdate(agendamentoId, { paciente: pacienteId,  status: 'agendado' }, { new: true })
     .exec();
 
     // Obtém o token de acesso do Google
