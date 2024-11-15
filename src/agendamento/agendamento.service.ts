@@ -7,7 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+
 import { Agendamento, AgendamentoDocument } from './agendamento.schema';
 import { Paciente, PacienteDocument } from '../paciente/paciente.schema';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
@@ -15,6 +15,9 @@ import { addSeconds, parseISO } from 'date-fns';
 import * as cron from 'node-cron';
 import { CalendarService } from '../google-calendar/google-calendar.service';
 import { AuthService } from '../auth/auth.service';
+import mongoose, { Model } from 'mongoose';
+import { format } from 'date-fns-tz';
+
 
 @Injectable()
 export class AgendamentoService implements OnModuleInit {
@@ -142,8 +145,9 @@ export class AgendamentoService implements OnModuleInit {
   
  // Função confirmando o agendamento
  
- async confirmarAgendamento(agendamento: CreateAgendamentoDto) {
-  const { agendamentoId, pacienteNome, pacienteEmail, pacienteTelefone } = agendamento;
+// Função confirmando o agendamento
+async confirmarAgendamento(agendamentoDto: CreateAgendamentoDto) {
+  const { agendamentoId, pacienteNome, pacienteEmail, pacienteTelefone, horarioId } = agendamentoDto;
 
   // Cria um novo documento de paciente
   const paciente = new this.pacienteModel({
@@ -156,88 +160,114 @@ export class AgendamentoService implements OnModuleInit {
   const savedPaciente = await paciente.save();
   const pacienteId = savedPaciente._id;
 
- // Atualiza o agendamento com as informações do paciente 
-  const updatedAgendamento = await this.agendamentoModel
-    .findByIdAndUpdate(agendamentoId, { paciente: pacienteId,  status: 'agendado' }, { new: true })
-    .exec();
+  // Busca o agendamento pelo ID e encontra o horário especificado
+  const agendamento = await this.agendamentoModel.findById(agendamentoId).exec();
+  if (!agendamento) throw new Error('Agendamento não encontrado');
 
-    // Obtém o token de acesso do Google
+  const disponibilidade = agendamento.disponibilidade.find(d => 
+    d.horarios.some(h => h._id.toString() === horarioId)
+  );
+
+  if (!disponibilidade) throw new Error('Horário não encontrado');
+
+  const horario = disponibilidade.horarios.find(h => h._id.toString() === horarioId);
+  if (!horario) throw new Error('Horário inválido');
+
+  // Atualiza o horário como reservado e associa ao paciente
+  horario.reservado = true;
+  horario.paciente = pacienteId as unknown as mongoose.Schema.Types.ObjectId;
+
+  // Atualiza o agendamento com as informações do paciente e status
+  agendamento.status = 'agendado';
+  await agendamento.save();
+
+  // Obtém o token de acesso do Google
   const accessToken = this.authService.getAccessToken();
 
   // Prepara os dados do agendamento para o Google Calendar
-  const agendamentoData = {
-    titulo: updatedAgendamento.titulo,
-    descricao: updatedAgendamento.descricao,
-    start: updatedAgendamento.disponibilidade[0].horarios[0].inicio,
-    end: updatedAgendamento.disponibilidade[0].horarios[0].fim,
-    dia: updatedAgendamento.disponibilidade[0].dia,
-    pacienteEmail: savedPaciente.email,
-  };
-
   const eventData = {
-    summary: agendamentoData.titulo,
-    description: agendamentoData.descricao,
+    summary: agendamento.titulo,
+    description: agendamento.descricao,
     start: {
-      dateTime: new Date(`${agendamentoData.dia.toISOString().split('T')[0]}T${agendamentoData.start}:00`).toISOString(),
+      dateTime: format(
+        parseISO(`${disponibilidade.dia.toISOString().split('T')[0]}T${horario.inicio}:00`),
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        { timeZone: 'America/Sao_Paulo' }
+      ),
       timeZone: 'America/Sao_Paulo',
     },
     end: {
-      dateTime: new Date(`${agendamentoData.dia.toISOString().split('T')[0]}T${agendamentoData.end}:00`).toISOString(),
+      dateTime: format(
+        parseISO(`${disponibilidade.dia.toISOString().split('T')[0]}T${horario.fim}:00`),
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        { timeZone: 'America/Sao_Paulo' }
+      ),
       timeZone: 'America/Sao_Paulo',
     },
     attendees: [
-      { email: agendamentoData.pacienteEmail },
+      { email: pacienteEmail },
     ],
   };
 
   // Cria o evento no Google Calendar
   const calendarEvent = await this.calendarService.createEvent(eventData, accessToken);
 
-   // Obtém o link do Google Meet, se disponível
-  const meetLink = calendarEvent.conferenceData?.entryPoints?.find(entry => entry.entryPointType === 'video')?.uri;
-
-  console.log('Google Meet Link:', meetLink);
-
-  
-
-// Atualizar o agendamento com o ID do Google Calendar
-  updatedAgendamento.googleCalendarId = calendarEvent.id;
-  await updatedAgendamento.save();
-
+  // Atualiza o agendamento com o ID do Google Calendar
+  agendamento.googleCalendarId = calendarEvent.id;
+  await agendamento.save();
 
   return {
-    agendamento: updatedAgendamento,
-    calendarEvent: calendarEvent,
+    agendamento,
+    calendarEvent,
   };
 }
 
-async atualizarAgendamento(googleCalendarId: string, updateData: CreateAgendamentoDto, accessToken: string) {
-  const { titulo, descricao, disponibilidade, status, formatoConsulta, pacienteEmail } = updateData;
+
+
+async atualizarAgendamento(
+  googleCalendarId: string, 
+  updateData: CreateAgendamentoDto, 
+  accessToken: string
+) {
+  const { titulo, descricao, horarioId, status, formatoConsulta, pacienteEmail } = updateData;
 
   const agendamento = await this.agendamentoModel.findOne({ googleCalendarId }).exec();
   if (!agendamento) {
     throw new Error('Agendamento não encontrado');
   }
 
-  // Verifique se as datas e horários estão corretos
-  const dia = new Date(disponibilidade[0].dia).toISOString().split('T')[0]; // Garante 'YYYY-MM-DD'
+  // Encontre o horário específico pelo `horarioId`
+  let horarioEscolhido = null;
+  let diaEscolhido = null;
 
-  const startDateTime = new Date(`${dia}T${disponibilidade[0].horarios[0].inicio}:00`);
-  const endDateTime = new Date(`${dia}T${disponibilidade[0].horarios[0].fim}:00`);
+  // Iterar sobre as disponibilidades para encontrar o horário certo
+  for (const disp of agendamento.disponibilidade) {
+    const horario = disp.horarios.find(h => h._id?.toString() === horarioId);
+    if (horario) {
+      horarioEscolhido = horario;
+      diaEscolhido = disp.dia;
+      break;
+    }
+  }
 
-  // **Valide o formato das horas:**
+  if (!horarioEscolhido) {
+    throw new Error('Horário não encontrado ou inválido');
+  }
+
+  // Validação das horas
   const isValidHourFormat = (time: string) => /^\d{2}:\d{2}$/.test(time);
-
-  if (!isValidHourFormat(disponibilidade[0].horarios[0].inicio) || !isValidHourFormat(disponibilidade[0].horarios[0].fim)) {
-    throw new Error(`Formato de hora inválido. Início: ${disponibilidade[0].horarios[0].inicio}, Fim: ${disponibilidade[0].horarios[0].fim}`);
+  if (!isValidHourFormat(horarioEscolhido.inicio) || !isValidHourFormat(horarioEscolhido.fim)) {
+    throw new Error(`Formato de hora inválido. Início: ${horarioEscolhido.inicio}, Fim: ${horarioEscolhido.fim}`);
   }
 
-  // **Verifique se as datas são válidas:**
+  // Verificar se a data é válida
+  const dia = diaEscolhido.toISOString().split('T')[0];
+  const startDateTime = new Date(`${dia}T${horarioEscolhido.inicio}:00`);
+  const endDateTime = new Date(`${dia}T${horarioEscolhido.fim}:00`);
+
   if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
-    throw new Error(`Data ou hora inválida. Verifique o formato das datas e horários. Recebido: ${dia}, Início: ${disponibilidade[0].horarios[0].inicio}, Fim: ${disponibilidade[0].horarios[0].fim}`);
+    throw new Error(`Data ou hora inválida. Recebido: ${dia}, Início: ${horarioEscolhido.inicio}, Fim: ${horarioEscolhido.fim}`);
   }
-
-  
 
   // Atualizar evento no Google Calendar
   const eventData = {
@@ -258,15 +288,13 @@ async atualizarAgendamento(googleCalendarId: string, updateData: CreateAgendamen
 
   const updatedCalendarEvent = await this.calendarService.updateEvent(googleCalendarId, eventData, accessToken);
 
-  // Atualizar agendamento no backend
+  // Atualizar informações no backend
   agendamento.titulo = titulo;
   agendamento.descricao = descricao;
   agendamento.status = status;
   agendamento.formatoConsulta = formatoConsulta;
-  agendamento.disponibilidade = disponibilidade.map(d => ({
-    dia: new Date(d.dia),
-    horarios: d.horarios
-  }));
+
+  // Salvar alterações no MongoDB
   await agendamento.save();
 
   return {
@@ -277,33 +305,54 @@ async atualizarAgendamento(googleCalendarId: string, updateData: CreateAgendamen
 
 
 
+
+// Atualizar agendamento por _id (sem Google Calendar)
 // Atualizar agendamento por _id (sem Google Calendar)
 async atualizarAgendamentoPorId(id: string, updateData: CreateAgendamentoDto) {
-  // Atualizar agendamento no backend
   const agendamento = await this.agendamentoModel.findById(id).exec();
   if (!agendamento) {
     throw new NotFoundException('Agendamento não encontrado');
   }
 
+  // Atualiza os campos básicos
   agendamento.titulo = updateData.titulo;
   agendamento.descricao = updateData.descricao;
   agendamento.status = updateData.status;
-  agendamento.formatoConsulta = updateData.formatoConsulta;
 
+  // Atualiza a disponibilidade preservando os _id dos horários existentes
+  agendamento.disponibilidade = updateData.disponibilidade.map((d) => {
+    const existingDisponibilidade = agendamento.disponibilidade.find(
+      (disp) => disp.dia.toISOString() === new Date(d.dia).toISOString()
+    );
 
-  
-  //agendamento.pacienteEmail = updateData.pacienteEmail;
-  //agendamento.formatoConsulta = updateData.formatoConsulta;
- // agendamento.valor = updateData.valor;
-  agendamento.disponibilidade = updateData.disponibilidade.map(d => ({
-    dia: new Date(d.dia),
-    horarios: d.horarios,
-  }));
+    return {
+      dia: new Date(d.dia),
+      horarios: d.horarios.map((h) => {
+        const existingHorario = existingDisponibilidade?.horarios.find(
+          (eh) => eh.inicio === h.inicio && eh.fim === h.fim
+        );
+
+        return {
+          _id: existingHorario ? existingHorario._id : new mongoose.Types.ObjectId(),
+          inicio: h.inicio,
+          fim: h.fim,
+          duracao: h.duracao,
+          reservado: h.reservado || false,
+          paciente: h.paciente
+            ? (h.paciente as unknown as mongoose.Schema.Types.ObjectId)
+            : null,
+        };
+      }),
+    };
+  });
 
   await agendamento.save();
 
   return { message: 'Agendamento atualizado com sucesso', agendamento };
 }
+
+
+
 
 
 

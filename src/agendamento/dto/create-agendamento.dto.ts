@@ -1,5 +1,6 @@
-import { IsNotEmpty, IsEmail, IsString, IsArray, ValidateNested, IsDateString } from 'class-validator';
+import { IsNotEmpty, IsEmail, IsString, IsArray, ValidateNested, IsDateString, IsBoolean, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
+import { Types } from 'mongoose';
 
 class HorarioDto {
   @IsNotEmpty()
@@ -11,8 +12,15 @@ class HorarioDto {
   fim: string;
 
   @IsNotEmpty()
-  @IsString()
   duracao: number;
+
+  // Novas Propriedades
+  @IsBoolean()
+  @IsOptional()
+  reservado: boolean;
+
+  @IsOptional()
+  paciente: Types.ObjectId | null;
 }
 
 class DisponibilidadeDto {
@@ -59,10 +67,14 @@ export class CreateAgendamentoDto {
   @IsString()
   formatoConsulta: string;
 
-  
+  // Use apenas a estrutura de disponibilidade para datas e horários
+  @IsNotEmpty()
+  @IsString()
+  horarioId: string; 
 
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => DisponibilidadeDto)
-  disponibilidade: DisponibilidadeDto[];
+   // Adicionando a propriedade disponibilidade
+   @IsArray()
+   @ValidateNested({ each: true })
+   @Type(() => DisponibilidadeDto)
+   disponibilidade: DisponibilidadeDto[];
 }
