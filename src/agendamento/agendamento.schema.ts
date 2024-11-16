@@ -39,7 +39,7 @@ export class Agendamento {
           {
             _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
             reservado: { type: Boolean, default: false },
-            paciente: { type: mongoose.Schema.Types.ObjectId, ref: 'Paciente', required: false },
+            paciente: { type: Types.ObjectId, ref: 'Paciente', required: false },
             inicio: { type: String, required: true },
             fim: { type: String, required: true },
             duracao: { type: Number, required: true },
@@ -57,7 +57,7 @@ export class Agendamento {
       inicio: string;
       fim: string;
       duracao: number;
-      paciente: mongoose.Schema.Types.ObjectId; // Usar ObjectId para referência
+      paciente: Types.ObjectId; // Usar ObjectId para referência
     }>;
   }>;
 }
