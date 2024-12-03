@@ -77,7 +77,7 @@ export class AgendamentoService implements OnModuleInit {
     return this.agendamentoModel.findById(id).exec();
   }
 
-  async updateStatusAgendamentos(novoStatus: string, idAgendamento: string) {
+  async updateStatusAgendamentos(status: string, idAgendamento: string) {
     const agendamento: AgendamentoDocument = await this.findById(idAgendamento);
 
     if (!agendamento) {
@@ -85,7 +85,7 @@ export class AgendamentoService implements OnModuleInit {
     }
 
     const updatedAgendamento = await this.agendamentoModel
-      .findByIdAndUpdate(idAgendamento, { status: novoStatus }, { new: true })
+      .findByIdAndUpdate(idAgendamento, { status: status }, { new: true })
       .exec();
 
     if (!updatedAgendamento) {
@@ -95,7 +95,7 @@ export class AgendamentoService implements OnModuleInit {
     }
 
     this.logger.log(
-      `Status do agendamento ${idAgendamento} atualizado para ${novoStatus}`,
+      `Status do agendamento ${idAgendamento} atualizado para ${status}`,
     );
     return updatedAgendamento;
   }
@@ -142,115 +142,113 @@ export class AgendamentoService implements OnModuleInit {
     return agendamento;
   }
 
-  // Função confirmando o agendamento
+  
 
-  // Função confirmando o agendamento
-  async confirmarAgendamento(agendamentoDto: CreateAgendamentoDto) {
-    const {
-      agendamentoId,
-      pacienteNome,
-      pacienteEmail,
-      pacienteTelefone,
-      horarioId,
-    } = agendamentoDto;
+ // Função confirmando o agendamento
 
-    // Cria um novo documento de paciente
-    const paciente = new this.pacienteModel({
-      nome: pacienteNome,
-      email: pacienteEmail,
-      telefone: pacienteTelefone,
-    });
+ async confirmarAgendamento(agendamentoDto: CreateAgendamentoDto) {
+  const {
+    agendamentoId,
+    pacienteNome,
+    pacienteEmail,
+    pacienteTelefone,
+    horarioId,
+  } = agendamentoDto;
 
-    // Salva o paciente no banco de dados
-    const savedPaciente = await paciente.save();
-    const pacienteId = savedPaciente._id;
+  // Cria um novo documento de paciente
+  const paciente = new this.pacienteModel({
+    nome: pacienteNome,
+    email: pacienteEmail,
+    telefone: pacienteTelefone,
+  });
 
-    // Busca o agendamento pelo ID e encontra o horário especificado
-    const agendamento = await this.agendamentoModel
-      .findById(agendamentoId)
-      .exec();
-    if (!agendamento) throw new Error('Agendamento não encontrado');
+  // Salva o paciente no banco de dados
+  const savedPaciente = await paciente.save();
+  const pacienteId = savedPaciente._id as mongoose.Types.ObjectId;
 
-    const disponibilidade = agendamento.disponibilidade.find((d) =>
-      d.horarios.some((h) => h._id.toString() === horarioId),
-    );
+  // Busca o agendamento pelo ID e encontra o horário especificado
+  const agendamento = await this.agendamentoModel.findById(agendamentoId).exec();
+  if (!agendamento) throw new Error('Agendamento não encontrado');
 
-    if (!disponibilidade) throw new Error('Horário não encontrado');
+  const disponibilidade = agendamento.disponibilidade.find((d) =>
+    d.horarios.some((h) => h._id.toString() === horarioId),
+  );
 
-    const horario = disponibilidade.horarios.find(
-      (h) => h._id.toString() === horarioId,
-    );
-    if (!horario) throw new Error('Horário inválido');
+  if (!disponibilidade) throw new Error('Horário não encontrado');
 
-    // Atualiza o horário como reservado e associa ao paciente
-    horario.reservado = true;
-    horario.paciente = pacienteId as Types.ObjectId;
+  const horario = disponibilidade.horarios.find(
+    (h) => h._id.toString() === horarioId,
+  );
+  if (!horario) throw new Error('Horário inválido');
 
-    // Atualiza o agendamento com as informações do paciente e status
-    agendamento.status = 'agendado';
-    await agendamento.save();
-
-    // Obtém o token de acesso do Google
-    const accessToken = this.authService.getAccessToken();
-
-    // Prepara os dados do agendamento para o Google Calendar
-    const eventData = {
-      summary: agendamento.titulo,
-      description: agendamento.descricao,
-      start: {
-        dateTime: format(
-          parseISO(
-            `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.inicio}:00`,
-          ),
-          "yyyy-MM-dd'T'HH:mm:ssXXX",
-          { timeZone: 'America/Sao_Paulo' },
-        ),
-        timeZone: 'America/Sao_Paulo',
-      },
-      end: {
-        dateTime: format(
-          parseISO(
-            `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.fim}:00`,
-          ),
-          "yyyy-MM-dd'T'HH:mm:ssXXX",
-          { timeZone: 'America/Sao_Paulo' },
-        ),
-        timeZone: 'America/Sao_Paulo',
-      },
-      attendees: [{ email: pacienteEmail }],
-    };
-
-    // Cria o evento no Google Calendar
-    const calendarEvent = await this.calendarService.createEvent(
-      eventData,
-      accessToken,
-    );
-
-    // Atualiza o agendamento com o ID do Google Calendar
-    agendamento.googleCalendarId = calendarEvent.id;
-    await agendamento.save();
-
-    return {
-      agendamento,
-      calendarEvent,
-    };
+  // Verifica se o horário já está agendado
+  if (horario.status === 'agendado') {
+    throw new Error('Horário já está agendado');
   }
+
+  // Atualiza o horário com o ID do paciente e o status
+  horario.status = 'agendado';
+  horario.paciente = pacienteId; // Associa o paciente ao horário
+
+  // Salva as alterações no agendamento antes de criar o evento no Google Calendar
+  await agendamento.save();
+
+  // Obtém o token de acesso do Google
+  const accessToken = this.authService.getAccessToken();
+
+  // Prepara os dados do agendamento para o Google Calendar
+  const eventData = {
+    summary: agendamento.titulo,
+    description: agendamento.descricao,
+    start: {
+      dateTime: format(
+        parseISO(
+          `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.inicio}:00`,
+        ),
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        { timeZone: 'America/Sao_Paulo' },
+      ),
+      timeZone: 'America/Sao_Paulo',
+    },
+    end: {
+      dateTime: format(
+        parseISO(
+          `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.fim}:00`,
+        ),
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        { timeZone: 'America/Sao_Paulo' },
+      ),
+      timeZone: 'America/Sao_Paulo',
+    },
+    attendees: [{ email: pacienteEmail }],
+  };
+
+  // Cria o evento no Google Calendar
+  const calendarEvent = await this.calendarService.createEvent(
+    eventData,
+    accessToken,
+  );
+
+  // Atualiza o agendamento com o ID do Google Calendar
+  agendamento.googleCalendarId = calendarEvent.id;
+  await agendamento.save();
+
+  return {
+    agendamento,
+    calendarEvent,
+  };
+}
+
+
 
   
 
   async atualizarAgendamento(
     googleCalendarId: string,
-    updateData: CreateAgendamentoDto,
+    updateData: Partial<CreateAgendamentoDto>,
     accessToken: string,
   ) {
-    const {
-      titulo,
-      descricao,
-      status,
-      formatoConsulta,
-      disponibilidade,
-      pacienteEmail,
-    } = updateData;
+    const { titulo, descricao, formatoConsulta, disponibilidade, pacienteEmail } = updateData;
   
     // Localizar o agendamento pelo Google Calendar ID
     const agendamento = await this.agendamentoModel.findOne({ googleCalendarId }).exec();
@@ -258,79 +256,106 @@ export class AgendamentoService implements OnModuleInit {
       throw new Error('Agendamento não encontrado');
     }
   
-    // Garantir que a disponibilidade tenha pelo menos uma data e horário
-    if (!disponibilidade || disponibilidade.length === 0) {
-      throw new Error('Nenhuma disponibilidade fornecida');
+    // Atualizar disponibilidade, se fornecida
+    if (disponibilidade && disponibilidade.length > 0) {
+      disponibilidade.forEach((novaDisp) => {
+        const diaExistente = agendamento.disponibilidade.find(
+          (disp) => disp.dia.toISOString() === new Date(novaDisp.dia).toISOString(),
+        );
+  
+        if (diaExistente) {
+          novaDisp.horarios.forEach((novoHorario) => {
+            const horarioExistente = diaExistente.horarios.find(
+              (horario) =>
+                horario.inicio === novoHorario.inicio && horario.fim === novoHorario.fim,
+            );
+  
+            if (horarioExistente) {
+              horarioExistente.duracao = novoHorario.duracao ?? horarioExistente.duracao;
+              horarioExistente.status = novoHorario.status ?? horarioExistente.status;
+              horarioExistente.paciente = novoHorario.paciente ?? horarioExistente.paciente;
+            } else {
+              diaExistente.horarios.push({
+                _id: new Types.ObjectId(),
+                ...novoHorario,
+                status: novoHorario.status ?? 'disponivel',
+                paciente: novoHorario.paciente ?? null,
+              });
+            }
+          });
+        } else {
+          agendamento.disponibilidade.push({
+            dia: new Date(novaDisp.dia),
+            horarios: novaDisp.horarios.map((horario) => ({
+              _id: new Types.ObjectId(),
+              ...horario,
+              status: horario.status ?? 'disponivel',
+              paciente: horario.paciente ?? null,
+            })),
+          });
+        }
+      });
     }
   
-    const novaDisponibilidade = disponibilidade[0]; // Assume a primeira data/hora fornecida
-    const novoDia = new Date(novaDisponibilidade.dia);
-    const novoHorario = novaDisponibilidade.horarios[0]; // Assume o primeiro horário fornecido
+    // Validar o e-mail do participante
+    if (!pacienteEmail) {
+      throw new Error('E-mail do participante não encontrado');
+    }
   
-    // Validar o formato do horário
-    const isValidHourFormat = (time: string) => /^\d{2}:\d{2}$/.test(time);
-    if (!isValidHourFormat(novoHorario.inicio) || !isValidHourFormat(novoHorario.fim)) {
-      throw new Error(
-        `Formato de hora inválido. Início: ${novoHorario.inicio}, Fim: ${novoHorario.fim}`,
+    // Atualizar evento no Google Calendar
+    try {
+      const diaAtual = disponibilidade
+        ? disponibilidade[0].dia
+        : agendamento.disponibilidade[0]?.dia;
+      const horarioAtual = disponibilidade
+        ? disponibilidade[0].horarios[0]
+        : agendamento.disponibilidade[0]?.horarios[0];
+  
+      if (!diaAtual || !horarioAtual) {
+        throw new Error('Horário e dia não disponíveis para atualizar o Google Calendar');
+      }
+  
+      const eventData = {
+        summary: titulo || agendamento.titulo,
+        description: descricao || agendamento.descricao,
+        start: {
+          dateTime: new Date(`${new Date(diaAtual).toISOString().split('T')[0]}T${horarioAtual.inicio}:00`).toISOString(),
+          timeZone: 'America/Sao_Paulo',
+        },
+        end: {
+          dateTime: new Date(`${new Date(diaAtual).toISOString().split('T')[0]}T${horarioAtual.fim}:00`).toISOString(),
+          timeZone: 'America/Sao_Paulo',
+        },
+        attendees: [{ email: pacienteEmail }],
+      };
+  
+      const updatedCalendarEvent = await this.calendarService.updateEvent(
+        googleCalendarId,
+        eventData,
+        accessToken,
       );
+  
+      // Atualizar os outros dados do agendamento no banco
+      if (titulo) agendamento.titulo = titulo;
+      if (descricao) agendamento.descricao = descricao;
+      if (formatoConsulta) agendamento.formatoConsulta = formatoConsulta;
+  
+      await agendamento.save();
+  
+      return {
+        agendamento,
+        updatedCalendarEvent,
+      };
+    } catch (error) {
+      console.error('Erro ao atualizar evento no Google Calendar:', error);
+      throw new Error('Não foi possível atualizar o evento no Google Calendar');
     }
-  
-    // Construir data e hora de início e fim
-    const startDateTime = new Date(`${novoDia.toISOString().split('T')[0]}T${novoHorario.inicio}:00`);
-    const endDateTime = new Date(`${novoDia.toISOString().split('T')[0]}T${novoHorario.fim}:00`);
-  
-    if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
-      throw new Error('Data ou hora inválida');
-    }
-  
-    // Atualizar o evento no Google Calendar
-    const eventData = {
-      summary: titulo,
-      description: descricao,
-      start: {
-        dateTime: startDateTime.toISOString(),
-        timeZone: 'America/Sao_Paulo',
-      },
-      end: {
-        dateTime: endDateTime.toISOString(),
-        timeZone: 'America/Sao_Paulo',
-      },
-      attendees: [{ email: pacienteEmail }],
-    };
-  
-    const updatedCalendarEvent = await this.calendarService.updateEvent(
-      googleCalendarId,
-      eventData,
-      accessToken,
-    );
-  
-    // Atualizar os dados do agendamento no banco
-    agendamento.titulo = titulo;
-    agendamento.descricao = descricao;
-    agendamento.status = status;
-    agendamento.formatoConsulta = formatoConsulta;
-    agendamento.disponibilidade = [
-      {
-        dia: novoDia,
-        horarios: [
-          {
-            _id: new Types.ObjectId(), // Gerar novo ID para o horário atualizado
-            inicio: novoHorario.inicio,
-            fim: novoHorario.fim,
-            duracao: novoHorario.duracao,
-            reservado: true,
-            paciente: new Types.ObjectId(), // Opcional: associar a um paciente, se necessário
-          },
-        ],
-      },
-    ];
-    await agendamento.save();
-  
-    return {
-      agendamento,
-      updatedCalendarEvent,
-    };
   }
+  
+  
+  
+  
+  
   
 
   // Atualizar agendamento por _id (sem Google Calendar)
@@ -338,7 +363,6 @@ export class AgendamentoService implements OnModuleInit {
     const {
       titulo,
       descricao,
-      status,
       formatoConsulta,
       disponibilidade,
     } = updateData;
@@ -352,47 +376,54 @@ export class AgendamentoService implements OnModuleInit {
     // Atualizar apenas os campos fornecidos
     if (titulo) agendamento.titulo = titulo;
     if (descricao) agendamento.descricao = descricao;
-    if (status) agendamento.status = status;
+  
     if (formatoConsulta) agendamento.formatoConsulta = formatoConsulta;
   
     // Atualizar disponibilidade, caso fornecida
-    if (disponibilidade && disponibilidade.length > 0) {
-      const novaDisponibilidade = disponibilidade[0]; // Assume a primeira data/hora fornecida
-      const novoDia = new Date(novaDisponibilidade.dia);
-      const novoHorario = novaDisponibilidade.horarios[0]; // Assume o primeiro horário fornecido
-  
-      // Validar o formato do horário, caso fornecido
-      const isValidHourFormat = (time: string) => /^\d{2}:\d{2}$/.test(time);
-      if (novoHorario && (!isValidHourFormat(novoHorario.inicio) || !isValidHourFormat(novoHorario.fim))) {
-        throw new Error(
-          `Formato de hora inválido. Início: ${novoHorario?.inicio}, Fim: ${novoHorario?.fim}`,
-        );
+   // Atualizar disponibilidade, caso fornecida
+  if (disponibilidade && disponibilidade.length > 0) {
+    disponibilidade.forEach((novaDisp) => {
+      const diaExistente = agendamento.disponibilidade.find(
+        (disp) => disp.dia.toISOString() === new Date(novaDisp.dia).toISOString(),
+      );
+
+      if (diaExistente) {
+        // Atualizar horários do dia existente
+        novaDisp.horarios.forEach((novoHorario) => {
+          const horarioExistente = diaExistente.horarios.find(
+            (horario) =>
+              horario.inicio === novoHorario.inicio && horario.fim === novoHorario.fim,
+          );
+
+          if (horarioExistente) {
+            // Atualizar dados do horário existente
+            horarioExistente.duracao = novoHorario.duracao;
+            horarioExistente.status = novoHorario.status ?? horarioExistente.status; // Substituição de reservado por status
+            horarioExistente.paciente = novoHorario.paciente ?? horarioExistente.paciente;
+          } else {
+            // Adicionar novo horário ao dia existente
+            diaExistente.horarios.push({
+              _id: new Types.ObjectId(),
+              ...novoHorario,
+              status: novoHorario.status ?? 'disponivel', // Define um status padrão
+              paciente: novoHorario.paciente ?? null,
+            });
+          }
+        });
+      } else {
+        // Adicionar um novo dia com horários
+        agendamento.disponibilidade.push({
+          dia: new Date(novaDisp.dia),
+          horarios: novaDisp.horarios.map((horario) => ({
+            _id: new Types.ObjectId(),
+            ...horario,
+            status: horario.status ?? 'disponivel', // Define um status padrão
+            paciente: horario.paciente ?? null,
+          })),
+        });
       }
-  
-      // Construir data e hora de início e fim
-      const startDateTime = new Date(`${novoDia.toISOString().split('T')[0]}T${novoHorario.inicio}:00`);
-      const endDateTime = new Date(`${novoDia.toISOString().split('T')[0]}T${novoHorario.fim}:00`);
-  
-      if (isNaN(startDateTime.getTime()) || isNaN(endDateTime.getTime())) {
-        throw new Error('Data ou hora inválida');
-      }
-  
-      agendamento.disponibilidade = [
-        {
-          dia: novoDia,
-          horarios: [
-            {
-              _id: new Types.ObjectId(), // Gerar novo ID para o horário atualizado
-              inicio: novoHorario.inicio,
-              fim: novoHorario.fim,
-              duracao: novoHorario.duracao,
-              reservado: true,
-              paciente: new Types.ObjectId(), // Opcional: associar a um paciente, se necessário
-            },
-          ],
-        },
-      ];
-    }
+    });
+  }
   
     await agendamento.save();
   
@@ -401,6 +432,7 @@ export class AgendamentoService implements OnModuleInit {
       agendamento,
     };
   }
+  
   
   
 

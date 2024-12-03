@@ -1,6 +1,7 @@
 import { IsNotEmpty, IsEmail, IsString, IsArray, ValidateNested, IsDateString, IsBoolean, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Types } from 'mongoose';
+import { IsIn } from 'class-validator';
 
 class HorarioDto {
   @IsNotEmpty()
@@ -14,10 +15,10 @@ class HorarioDto {
   @IsNotEmpty()
   duracao: number;
 
-  // Novas Propriedades
-  @IsBoolean()
-  @IsOptional()
-  reservado: boolean;
+  @IsNotEmpty()
+  @IsString()
+  @IsIn(['disponivel', 'cancelado', 'concluido', 'ausente', 'expirado', 'agendado']) // Restrições do campo status
+  status: string;
 
   @IsOptional()
   paciente: Types.ObjectId | null;
@@ -59,9 +60,7 @@ export class CreateAgendamentoDto {
   @IsString()
   descricao: string;
 
-  @IsNotEmpty()
-  @IsString()
-  status: string;
+  
 
   @IsNotEmpty()
   @IsString()

@@ -22,8 +22,7 @@ export class Agendamento {
   @Prop({ type: String, enum: ['online', 'presencial'], required: true })
   formatoConsulta: string;
 
-  @Prop({ type: String, enum: ['disponivel', 'cancelado', 'concluido', 'ausente', 'expirado', 'agendado'], required: false })
-  status: string;
+  
 
   @Prop({ required: true })
   valor: number;
@@ -38,7 +37,11 @@ export class Agendamento {
         horarios: [
           {
             _id: { type: mongoose.Schema.Types.ObjectId, auto: true },
-            reservado: { type: Boolean, default: false },
+            status: {
+              type: String,
+              enum: ['disponivel', 'cancelado', 'concluido', 'ausente', 'expirado', 'agendado'],
+              required: true,
+            },
             paciente: { type: Types.ObjectId, ref: 'Paciente', required: false },
             inicio: { type: String, required: true },
             fim: { type: String, required: true },
@@ -53,7 +56,7 @@ export class Agendamento {
     dia: Date;
     horarios: Array<{
       _id: Types.ObjectId;
-      reservado: boolean;
+     status: String;
       inicio: string;
       fim: string;
       duracao: number;
