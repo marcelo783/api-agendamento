@@ -22,6 +22,10 @@ class HorarioDto {
 
   @IsOptional()
   paciente: Types.ObjectId | null;
+
+  @IsOptional() // O Google Calendar ID é opcional inicialmente
+  @IsString()
+  googleCalendarId?: string;
 }
 
 class DisponibilidadeDto {
@@ -40,7 +44,7 @@ export class CreateAgendamentoDto {
   @IsString()
   pacienteNome: string;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsEmail()
   pacienteEmail: string;
 

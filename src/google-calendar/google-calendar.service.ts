@@ -34,12 +34,13 @@ export class CalendarService {
     if (!accessToken) {
       throw new UnauthorizedException('No access token set.');
     }
-
+  
     const oauth2Client = new google.auth.OAuth2();
     oauth2Client.setCredentials({ access_token: accessToken });
     this.calendar = google.calendar({ version: 'v3', auth: oauth2Client });
-
-    const eventWithConference = {
+  
+    // Apenas adiciona attendees se existirem
+    const eventWithConference: calendar_v3.Schema$Event = {
       ...event,
       conferenceData: {
         createRequest: {
@@ -49,20 +50,22 @@ export class CalendarService {
           },
         },
       },
-      attendees: [
-        { email: event.attendees[0].email } // Certifique-se de incluir os e-mails dos convidados
-      ],
+      // Inclui attendees somente se houver participantes
+      attendees: event.attendees?.length
+        ? event.attendees.map((attendee) => ({ email: attendee.email }))
+        : undefined,
     };
-
+  
     const res = await this.calendar.events.insert({
       calendarId: 'primary',
       requestBody: eventWithConference,
       conferenceDataVersion: 1,
       sendUpdates: 'all', // Garante que e-mails de atualização sejam enviados
     });
-
+  
     return res.data;
   }
+  
 
   async updateEvent(eventId: string, event: calendar_v3.Schema$Event, accessToken: string): Promise<calendar_v3.Schema$Event> {
     if (!accessToken) {

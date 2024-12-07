@@ -46,6 +46,7 @@ export class Agendamento {
             inicio: { type: String, required: true },
             fim: { type: String, required: true },
             duracao: { type: Number, required: true },
+            googleCalendarId: { type: String, required: false },
           }
         ]
       }
@@ -59,6 +60,7 @@ export class Agendamento {
      status: String;
       inicio: string;
       fim: string;
+      googleCalendarId?: string;
       duracao: number;
       paciente: Types.ObjectId; // Usar ObjectId para referência
     }>;

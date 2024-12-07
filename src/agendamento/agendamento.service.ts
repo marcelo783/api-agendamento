@@ -50,20 +50,53 @@ export class AgendamentoService implements OnModuleInit {
       .flat();
   }
 
-  async create(agendamento: Agendamento): Promise<Agendamento> {
+  async create(agendamento: Agendamento, accessToken: string): Promise<Agendamento> {
     const createdAgendamento = new this.agendamentoModel({
       ...agendamento,
       status: 'disponivel',
     });
-
+  
     if (agendamento.repete) {
       await this.createRepeatedAgendamentos(createdAgendamento);
     } else {
       await createdAgendamento.save();
     }
-
+  
+    // Envia os eventos para o Google Calendar
+    for (const disponibilidade of agendamento.disponibilidade) {
+      for (const horario of disponibilidade.horarios) {
+        const startDateTime = `${disponibilidade.dia}T${horario.inicio}:00`;
+        const endDateTime = `${disponibilidade.dia}T${horario.fim}:00`;
+  
+        const event = {
+          summary: agendamento.titulo,
+          description: agendamento.descricao,
+          start: {
+            dateTime: startDateTime, // Corrige para usar o dia e horário
+            timeZone: 'America/Sao_Paulo',
+          },
+          end: {
+            dateTime: endDateTime, // Corrige para usar o dia e horário
+            timeZone: 'America/Sao_Paulo',
+          },
+          attendees: undefined, // Não inclui convidados
+        };
+  
+        try {
+          // Cria o evento no Google Calendar
+          const calendarEvent = await this.calendarService.createEvent(event, accessToken);
+          horario.googleCalendarId = calendarEvent.id; // Associa o ID do evento no horário
+        } catch (error) {
+          throw new Error(`Erro ao criar evento no Google Calendar: ${error.message}`);
+        }
+      }
+    }
+  
+    // Salva o agendamento atualizado com os IDs do Google Calendar
+    await createdAgendamento.save();
     return createdAgendamento;
   }
+  
 
   async findAll(): Promise<Agendamento[]> {
     return this.agendamentoModel.find().exec();

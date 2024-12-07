@@ -20,13 +20,17 @@ async findById(
 
 
 
-  @Post()
-  async create(
-    @Body() createAgendamentoDto: Agendamento,
-   
-  ): Promise<Agendamento> {
-    return this.agendamentoService.create(createAgendamentoDto);
+@Post()
+async create(
+  @Body() createAgendamentoDto: Agendamento,
+  @Headers('Authorization') authorization: string // Extrai o token
+): Promise<Agendamento> {
+  const accessToken = authorization?.replace('Bearer ', ''); // Remove "Bearer "
+  if (!accessToken) {
+    throw new UnauthorizedException('Access token is missing.');
   }
+  return this.agendamentoService.create(createAgendamentoDto, accessToken);
+}
 
   //@Get()
   //async findAll(): Promise<Agendamento[]> {
