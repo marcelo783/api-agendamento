@@ -56,46 +56,50 @@ export class AgendamentoService implements OnModuleInit {
       status: 'disponivel',
     });
   
+    // Verifica se deve criar eventos repetidos
     if (agendamento.repete) {
       await this.createRepeatedAgendamentos(createdAgendamento);
     } else {
       await createdAgendamento.save();
     }
   
-    // Envia os eventos para o Google Calendar
-    for (const disponibilidade of agendamento.disponibilidade) {
+    // Criação de eventos no Google Calendar para cada slot de horário
+    for (const disponibilidade of createdAgendamento.disponibilidade) {
       for (const horario of disponibilidade.horarios) {
-        const startDateTime = `${disponibilidade.dia}T${horario.inicio}:00`;
-        const endDateTime = `${disponibilidade.dia}T${horario.fim}:00`;
-  
         const event = {
-          summary: agendamento.titulo,
-          description: agendamento.descricao,
+          summary: createdAgendamento.titulo,
+          description: createdAgendamento.descricao,
           start: {
-            dateTime: startDateTime, // Corrige para usar o dia e horário
+            dateTime: `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.inicio}:00`,
             timeZone: 'America/Sao_Paulo',
           },
           end: {
-            dateTime: endDateTime, // Corrige para usar o dia e horário
+            dateTime: `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.fim}:00`,
             timeZone: 'America/Sao_Paulo',
           },
-          attendees: undefined, // Não inclui convidados
+          attendees: [], // Sem paciente no momento
         };
   
-        try {
-          // Cria o evento no Google Calendar
-          const calendarEvent = await this.calendarService.createEvent(event, accessToken);
-          horario.googleCalendarId = calendarEvent.id; // Associa o ID do evento no horário
-        } catch (error) {
-          throw new Error(`Erro ao criar evento no Google Calendar: ${error.message}`);
+        // Tenta criar o evento no Google Calendar
+        const calendarEvent = await this.calendarService.createEvent(event, accessToken);
+  
+        // Se o evento foi criado, salva o ID no horário
+        if (calendarEvent.id) {
+          horario.googleCalendarId = calendarEvent.id;
+        } else {
+          throw new Error(`Erro ao criar evento no Google Calendar para o horário ${horario.inicio}-${horario.fim}`);
         }
       }
     }
   
-    // Salva o agendamento atualizado com os IDs do Google Calendar
+    // Salva o agendamento novamente com os IDs do Google Calendar
     await createdAgendamento.save();
+  
     return createdAgendamento;
   }
+  
+  
+  
   
 
   async findAll(): Promise<Agendamento[]> {
@@ -177,9 +181,13 @@ export class AgendamentoService implements OnModuleInit {
 
   
 
- // Função confirmando o agendamento
+ 
 
- async confirmarAgendamento(agendamentoDto: CreateAgendamentoDto) {
+ // Função confirmando o agendamento
+ async confirmarAgendamento(
+  agendamentoDto: CreateAgendamentoDto,
+  accessToken: string,
+): Promise<any> {
   const {
     agendamentoId,
     pacienteNome,
@@ -188,6 +196,10 @@ export class AgendamentoService implements OnModuleInit {
     horarioId,
   } = agendamentoDto;
 
+  if (!accessToken) {
+    throw new Error('Access token não fornecido para confirmar o agendamento');
+  }
+
   // Cria um novo documento de paciente
   const paciente = new this.pacienteModel({
     nome: pacienteNome,
@@ -195,11 +207,10 @@ export class AgendamentoService implements OnModuleInit {
     telefone: pacienteTelefone,
   });
 
-  // Salva o paciente no banco de dados
   const savedPaciente = await paciente.save();
   const pacienteId = savedPaciente._id as mongoose.Types.ObjectId;
 
-  // Busca o agendamento pelo ID e encontra o horário especificado
+  // Busca o agendamento e o horário especificado
   const agendamento = await this.agendamentoModel.findById(agendamentoId).exec();
   if (!agendamento) throw new Error('Agendamento não encontrado');
 
@@ -214,63 +225,48 @@ export class AgendamentoService implements OnModuleInit {
   );
   if (!horario) throw new Error('Horário inválido');
 
-  // Verifica se o horário já está agendado
   if (horario.status === 'agendado') {
     throw new Error('Horário já está agendado');
   }
 
-  // Atualiza o horário com o ID do paciente e o status
+  // Verifica se o horário possui um ID do Google Calendar
+  if (!horario.googleCalendarId) {
+    throw new Error('O horário não possui um ID do Google Calendar associado');
+  }
+
+  // Atualiza o horário com o status e o paciente
   horario.status = 'agendado';
-  horario.paciente = pacienteId; // Associa o paciente ao horário
+  horario.paciente = pacienteId;
 
-  // Salva as alterações no agendamento antes de criar o evento no Google Calendar
-  await agendamento.save();
-
-  // Obtém o token de acesso do Google
-  const accessToken = this.authService.getAccessToken();
-
-  // Prepara os dados do agendamento para o Google Calendar
+  // Atualiza o evento no Google Calendar
   const eventData = {
     summary: agendamento.titulo,
     description: agendamento.descricao,
     start: {
-      dateTime: format(
-        parseISO(
-          `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.inicio}:00`,
-        ),
-        "yyyy-MM-dd'T'HH:mm:ssXXX",
-        { timeZone: 'America/Sao_Paulo' },
-      ),
+      dateTime: `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.inicio}:00`,
       timeZone: 'America/Sao_Paulo',
     },
     end: {
-      dateTime: format(
-        parseISO(
-          `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.fim}:00`,
-        ),
-        "yyyy-MM-dd'T'HH:mm:ssXXX",
-        { timeZone: 'America/Sao_Paulo' },
-      ),
+      dateTime: `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.fim}:00`,
       timeZone: 'America/Sao_Paulo',
     },
-    attendees: [{ email: pacienteEmail }],
+    attendees: [{ email: pacienteEmail }], // Adiciona o paciente ao evento
   };
 
-  // Cria o evento no Google Calendar
-  const calendarEvent = await this.calendarService.createEvent(
-    eventData,
-    accessToken,
-  );
+  // Atualiza o evento no Google Calendar com as informações do paciente
+  await this.calendarService.updateEvent(horario.googleCalendarId, eventData, accessToken);
 
-  // Atualiza o agendamento com o ID do Google Calendar
-  agendamento.googleCalendarId = calendarEvent.id;
+  // Salva o agendamento atualizado
   await agendamento.save();
 
   return {
     agendamento,
-    calendarEvent,
+    message: 'Horário confirmado com sucesso!',
   };
 }
+
+
+
 
 
 

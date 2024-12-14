@@ -98,11 +98,18 @@ async deletarAgendamentoPorId(
   }
 
   @Patch('agendar')
-  async createAgendamento(
+  async confirmarAgendamento(
     @Body() createAgendamentoDto: CreateAgendamentoDto,
+    @Req() req: any, // Captura a requisição para obter o accessToken
   ): Promise<any> {
-    return this.agendamentoService.confirmarAgendamento(createAgendamentoDto);
+    const accessToken = req.headers.authorization?.split(' ')[1]; // Captura o access token do header
+    if (!accessToken) {
+      throw new Error('Access token não fornecido');
+    }
+  
+    return this.agendamentoService.confirmarAgendamento(createAgendamentoDto, accessToken);
   }
+  
 
   @Patch('atualizar/status/:status/agendamento/:agendamentoId')
   async updateStatus(

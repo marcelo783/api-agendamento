@@ -58,6 +58,7 @@ export class CalendarService {
   
     const res = await this.calendar.events.insert({
       calendarId: 'primary',
+      
       requestBody: eventWithConference,
       conferenceDataVersion: 1,
       sendUpdates: 'all', // Garante que e-mails de atualização sejam enviados
