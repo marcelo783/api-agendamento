@@ -4,6 +4,13 @@ import { Types } from 'mongoose';
 import { IsIn } from 'class-validator';
 
 class HorarioDto {
+
+ 
+  @IsOptional() // Apenas horários existentes terão `_id`
+  @IsString()   // MongoDB `_id` será sempre uma string ao ser recebido
+  _id?: string;
+
+
   @IsNotEmpty()
   @IsString()
   inicio: string;

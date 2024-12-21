@@ -8,6 +8,6 @@ import { AgendamentoModule } from 'src/agendamento/agendamento.module';
   imports: [AuthModule, forwardRef(() => AgendamentoModule)],
   providers: [CalendarService],
   controllers: [CalendarController],
-  exports: [CalendarService], // Certifique-se de exportar o CalendarService
+  exports: [CalendarService], 
 })
 export class GoogleCalendarModule {}

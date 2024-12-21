@@ -36,7 +36,7 @@ export class CalendarController {
   @Delete('event/:id')
   async deleteEvent(@Headers('authorization') authHeader: string, @Param('id') googleCalendarId: string) {
     const token = this.extractToken(authHeader);
-    return this.agendamentoService.deletarAgendamento(googleCalendarId, token);
+    return this.agendamentoService.deletarAgendamentoPorId(googleCalendarId, token);
   }
 
   private extractToken(authHeader: string): string {

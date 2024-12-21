@@ -50,19 +50,22 @@ export class AgendamentoService implements OnModuleInit {
       .flat();
   }
 
-  async create(agendamento: Agendamento, accessToken: string): Promise<Agendamento> {
+  async create(
+    agendamento: Agendamento,
+    accessToken: string,
+  ): Promise<Agendamento> {
     const createdAgendamento = new this.agendamentoModel({
       ...agendamento,
       status: 'disponivel',
     });
-  
+
     // Verifica se deve criar eventos repetidos
     if (agendamento.repete) {
       await this.createRepeatedAgendamentos(createdAgendamento);
     } else {
       await createdAgendamento.save();
     }
-  
+
     // Criação de eventos no Google Calendar para cada slot de horário
     for (const disponibilidade of createdAgendamento.disponibilidade) {
       for (const horario of disponibilidade.horarios) {
@@ -79,28 +82,29 @@ export class AgendamentoService implements OnModuleInit {
           },
           attendees: [], // Sem paciente no momento
         };
-  
+
         // Tenta criar o evento no Google Calendar
-        const calendarEvent = await this.calendarService.createEvent(event, accessToken);
-  
+        const calendarEvent = await this.calendarService.createEvent(
+          event,
+          accessToken,
+        );
+
         // Se o evento foi criado, salva o ID no horário
         if (calendarEvent.id) {
           horario.googleCalendarId = calendarEvent.id;
         } else {
-          throw new Error(`Erro ao criar evento no Google Calendar para o horário ${horario.inicio}-${horario.fim}`);
+          throw new Error(
+            `Erro ao criar evento no Google Calendar para o horário ${horario.inicio}-${horario.fim}`,
+          );
         }
       }
     }
-  
+
     // Salva o agendamento novamente com os IDs do Google Calendar
     await createdAgendamento.save();
-  
+
     return createdAgendamento;
   }
-  
-  
-  
-  
 
   async findAll(): Promise<Agendamento[]> {
     return this.agendamentoModel.find().exec();
@@ -179,321 +183,350 @@ export class AgendamentoService implements OnModuleInit {
     return agendamento;
   }
 
-  
+  // Função confirmando o agendamento
+  async confirmarAgendamento(
+    agendamentoDto: CreateAgendamentoDto,
+    accessToken: string,
+  ): Promise<any> {
+    const {
+      agendamentoId,
+      pacienteNome,
+      pacienteEmail,
+      pacienteTelefone,
+      horarioId,
+    } = agendamentoDto;
 
- 
+    if (!accessToken) {
+      throw new Error(
+        'Access token não fornecido para confirmar o agendamento',
+      );
+    }
 
- // Função confirmando o agendamento
- async confirmarAgendamento(
-  agendamentoDto: CreateAgendamentoDto,
-  accessToken: string,
-): Promise<any> {
-  const {
-    agendamentoId,
-    pacienteNome,
-    pacienteEmail,
-    pacienteTelefone,
-    horarioId,
-  } = agendamentoDto;
+    // Cria um novo documento de paciente
+    const paciente = new this.pacienteModel({
+      nome: pacienteNome,
+      email: pacienteEmail,
+      telefone: pacienteTelefone,
+    });
 
-  if (!accessToken) {
-    throw new Error('Access token não fornecido para confirmar o agendamento');
+    const savedPaciente = await paciente.save();
+    const pacienteId = savedPaciente._id as mongoose.Types.ObjectId;
+
+    // Busca o agendamento e o horário especificado
+    const agendamento = await this.agendamentoModel
+      .findById(agendamentoId)
+      .exec();
+    if (!agendamento) throw new Error('Agendamento não encontrado');
+
+    const disponibilidade = agendamento.disponibilidade.find((d) =>
+      d.horarios.some((h) => h._id.toString() === horarioId),
+    );
+
+    if (!disponibilidade) throw new Error('Horário não encontrado');
+
+    const horario = disponibilidade.horarios.find(
+      (h) => h._id.toString() === horarioId,
+    );
+    if (!horario) throw new Error('Horário inválido');
+
+    if (horario.status === 'agendado') {
+      throw new Error('Horário já está agendado');
+    }
+
+    // Verifica se o horário possui um ID do Google Calendar
+    if (!horario.googleCalendarId) {
+      throw new Error(
+        'O horário não possui um ID do Google Calendar associado',
+      );
+    }
+
+    // Atualiza o horário com o status e o paciente
+    horario.status = 'agendado';
+    horario.paciente = pacienteId;
+
+    // Atualiza o evento no Google Calendar
+    const eventData = {
+      summary: agendamento.titulo,
+      description: agendamento.descricao,
+      start: {
+        dateTime: `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.inicio}:00`,
+        timeZone: 'America/Sao_Paulo',
+      },
+      end: {
+        dateTime: `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.fim}:00`,
+        timeZone: 'America/Sao_Paulo',
+      },
+      attendees: [{ email: pacienteEmail }], // Adiciona o paciente ao evento
+    };
+
+    // Atualiza o evento no Google Calendar com as informações do paciente
+    await this.calendarService.updateEvent(
+      horario.googleCalendarId,
+      eventData,
+      accessToken,
+    );
+
+    // Salva o agendamento atualizado
+    await agendamento.save();
+
+    return {
+      agendamento,
+      message: 'Horário confirmado com sucesso!',
+    };
   }
-
-  // Cria um novo documento de paciente
-  const paciente = new this.pacienteModel({
-    nome: pacienteNome,
-    email: pacienteEmail,
-    telefone: pacienteTelefone,
-  });
-
-  const savedPaciente = await paciente.save();
-  const pacienteId = savedPaciente._id as mongoose.Types.ObjectId;
-
-  // Busca o agendamento e o horário especificado
-  const agendamento = await this.agendamentoModel.findById(agendamentoId).exec();
-  if (!agendamento) throw new Error('Agendamento não encontrado');
-
-  const disponibilidade = agendamento.disponibilidade.find((d) =>
-    d.horarios.some((h) => h._id.toString() === horarioId),
-  );
-
-  if (!disponibilidade) throw new Error('Horário não encontrado');
-
-  const horario = disponibilidade.horarios.find(
-    (h) => h._id.toString() === horarioId,
-  );
-  if (!horario) throw new Error('Horário inválido');
-
-  if (horario.status === 'agendado') {
-    throw new Error('Horário já está agendado');
-  }
-
-  // Verifica se o horário possui um ID do Google Calendar
-  if (!horario.googleCalendarId) {
-    throw new Error('O horário não possui um ID do Google Calendar associado');
-  }
-
-  // Atualiza o horário com o status e o paciente
-  horario.status = 'agendado';
-  horario.paciente = pacienteId;
-
-  // Atualiza o evento no Google Calendar
-  const eventData = {
-    summary: agendamento.titulo,
-    description: agendamento.descricao,
-    start: {
-      dateTime: `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.inicio}:00`,
-      timeZone: 'America/Sao_Paulo',
-    },
-    end: {
-      dateTime: `${disponibilidade.dia.toISOString().split('T')[0]}T${horario.fim}:00`,
-      timeZone: 'America/Sao_Paulo',
-    },
-    attendees: [{ email: pacienteEmail }], // Adiciona o paciente ao evento
-  };
-
-  // Atualiza o evento no Google Calendar com as informações do paciente
-  await this.calendarService.updateEvent(horario.googleCalendarId, eventData, accessToken);
-
-  // Salva o agendamento atualizado
-  await agendamento.save();
-
-  return {
-    agendamento,
-    message: 'Horário confirmado com sucesso!',
-  };
-}
-
-
-
-
-
-
-  
 
   async atualizarAgendamento(
-    googleCalendarId: string,
+    id: string,
     updateData: Partial<CreateAgendamentoDto>,
     accessToken: string,
-  ) {
-    const { titulo, descricao, formatoConsulta, disponibilidade, pacienteEmail } = updateData;
+  ): Promise<any> {
+    const { titulo, descricao, formatoConsulta, disponibilidade } = updateData;
   
-    // Localizar o agendamento pelo Google Calendar ID
-    const agendamento = await this.agendamentoModel.findOne({ googleCalendarId }).exec();
+    const agendamento = await this.agendamentoModel.findById(id).exec();
     if (!agendamento) {
       throw new Error('Agendamento não encontrado');
     }
   
-    // Atualizar disponibilidade, se fornecida
+    // Atualizar título, descrição e formato
+    if (titulo) agendamento.titulo = titulo;
+    if (descricao) agendamento.descricao = descricao;
+    if (formatoConsulta) agendamento.formatoConsulta = formatoConsulta;
+  
+    const horariosExistentes = agendamento.disponibilidade.flatMap(
+      (d) => d.horarios,
+    );
+  
     if (disponibilidade && disponibilidade.length > 0) {
-      disponibilidade.forEach((novaDisp) => {
+      for (const novaDisp of disponibilidade) {
         const diaExistente = agendamento.disponibilidade.find(
-          (disp) => disp.dia.toISOString() === new Date(novaDisp.dia).toISOString(),
+          (disp) =>
+            disp.dia.toISOString() === new Date(novaDisp.dia).toISOString(),
         );
   
         if (diaExistente) {
-          novaDisp.horarios.forEach((novoHorario) => {
-            const horarioExistente = diaExistente.horarios.find(
-              (horario) =>
-                horario.inicio === novoHorario.inicio && horario.fim === novoHorario.fim,
-            );
+          // Atualizar horários do dia existente
+          diaExistente.horarios = await Promise.all(
+            novaDisp.horarios.map(async (novoHorario) => {
+              const horarioExistente = diaExistente.horarios.find(
+                (horario) =>
+                  horario._id.toString() === novoHorario._id?.toString(),
+              );
   
-            if (horarioExistente) {
-              horarioExistente.duracao = novoHorario.duracao ?? horarioExistente.duracao;
-              horarioExistente.status = novoHorario.status ?? horarioExistente.status;
-              horarioExistente.paciente = novoHorario.paciente ?? horarioExistente.paciente;
-            } else {
-              diaExistente.horarios.push({
-                _id: new Types.ObjectId(),
-                ...novoHorario,
+              if (horarioExistente) {
+                horarioExistente.inicio = novoHorario.inicio;
+                horarioExistente.fim = novoHorario.fim;
+                horarioExistente.duracao = novoHorario.duracao;
+                horarioExistente.status = novoHorario.status ?? 'disponivel';
+                horarioExistente.paciente = novoHorario.paciente
+                  ? new Types.ObjectId(novoHorario.paciente)
+                  : null;
+  
+                // Atualizar evento no Google Calendar
+                if (horarioExistente.googleCalendarId) {
+                  const eventData = {
+                    summary: agendamento.titulo,
+                    description: agendamento.descricao,
+                    start: {
+                      dateTime: `${novaDisp.dia}T${horarioExistente.inicio}:00`,
+                      timeZone: 'America/Sao_Paulo',
+                    },
+                    end: {
+                      dateTime: `${novaDisp.dia}T${horarioExistente.fim}:00`,
+                      timeZone: 'America/Sao_Paulo',
+                    },
+                  };
+  
+                  await this.calendarService.updateEvent(
+                    horarioExistente.googleCalendarId,
+                    eventData,
+                    accessToken,
+                  );
+                }
+                return horarioExistente;
+              }
+  
+              // Criar novo evento no Google Calendar
+              const newEventData = {
+                summary: agendamento.titulo,
+                description: agendamento.descricao,
+                start: {
+                  dateTime: `${novaDisp.dia}T${novoHorario.inicio}:00`,
+                  timeZone: 'America/Sao_Paulo',
+                },
+                end: {
+                  dateTime: `${novaDisp.dia}T${novoHorario.fim}:00`,
+                  timeZone: 'America/Sao_Paulo',
+                },
+              };
+  
+              const calendarEvent = await this.calendarService.createEvent(
+                newEventData,
+                accessToken,
+              );
+  
+              return {
+                _id: novoHorario._id
+                  ? new Types.ObjectId(novoHorario._id)
+                  : new Types.ObjectId(),
+                googleCalendarId: calendarEvent.id,
+                inicio: novoHorario.inicio,
+                fim: novoHorario.fim,
+                duracao: novoHorario.duracao,
                 status: novoHorario.status ?? 'disponivel',
-                paciente: novoHorario.paciente ?? null,
-              });
-            }
-          });
-        } else {
-          agendamento.disponibilidade.push({
-            dia: new Date(novaDisp.dia),
-            horarios: novaDisp.horarios.map((horario) => ({
-              _id: new Types.ObjectId(),
-              ...horario,
-              status: horario.status ?? 'disponivel',
-              paciente: horario.paciente ?? null,
-            })),
-          });
-        }
-      });
-    }
-  
-    // Validar o e-mail do participante
-    if (!pacienteEmail) {
-      throw new Error('E-mail do participante não encontrado');
-    }
-  
-    // Atualizar evento no Google Calendar
-    try {
-      const diaAtual = disponibilidade
-        ? disponibilidade[0].dia
-        : agendamento.disponibilidade[0]?.dia;
-      const horarioAtual = disponibilidade
-        ? disponibilidade[0].horarios[0]
-        : agendamento.disponibilidade[0]?.horarios[0];
-  
-      if (!diaAtual || !horarioAtual) {
-        throw new Error('Horário e dia não disponíveis para atualizar o Google Calendar');
-      }
-  
-      const eventData = {
-        summary: titulo || agendamento.titulo,
-        description: descricao || agendamento.descricao,
-        start: {
-          dateTime: new Date(`${new Date(diaAtual).toISOString().split('T')[0]}T${horarioAtual.inicio}:00`).toISOString(),
-          timeZone: 'America/Sao_Paulo',
-        },
-        end: {
-          dateTime: new Date(`${new Date(diaAtual).toISOString().split('T')[0]}T${horarioAtual.fim}:00`).toISOString(),
-          timeZone: 'America/Sao_Paulo',
-        },
-        attendees: [{ email: pacienteEmail }],
-      };
-  
-      const updatedCalendarEvent = await this.calendarService.updateEvent(
-        googleCalendarId,
-        eventData,
-        accessToken,
-      );
-  
-      // Atualizar os outros dados do agendamento no banco
-      if (titulo) agendamento.titulo = titulo;
-      if (descricao) agendamento.descricao = descricao;
-      if (formatoConsulta) agendamento.formatoConsulta = formatoConsulta;
-  
-      await agendamento.save();
-  
-      return {
-        agendamento,
-        updatedCalendarEvent,
-      };
-    } catch (error) {
-      console.error('Erro ao atualizar evento no Google Calendar:', error);
-      throw new Error('Não foi possível atualizar o evento no Google Calendar');
-    }
-  }
-  
-  
-  
-  
-  
-  
-
-  // Atualizar agendamento por _id (sem Google Calendar)
-  async atualizarAgendamentoPorId(id: string, updateData: Partial<CreateAgendamentoDto>) {
-    const {
-      titulo,
-      descricao,
-      formatoConsulta,
-      disponibilidade,
-    } = updateData;
-  
-    // Buscar agendamento pelo ID
-    const agendamento = await this.agendamentoModel.findById(id).exec();
-    if (!agendamento) {
-      throw new NotFoundException('Agendamento não encontrado');
-    }
-  
-    // Atualizar apenas os campos fornecidos
-    if (titulo) agendamento.titulo = titulo;
-    if (descricao) agendamento.descricao = descricao;
-  
-    if (formatoConsulta) agendamento.formatoConsulta = formatoConsulta;
-  
-    // Atualizar disponibilidade, caso fornecida
-   // Atualizar disponibilidade, caso fornecida
-  if (disponibilidade && disponibilidade.length > 0) {
-    disponibilidade.forEach((novaDisp) => {
-      const diaExistente = agendamento.disponibilidade.find(
-        (disp) => disp.dia.toISOString() === new Date(novaDisp.dia).toISOString(),
-      );
-
-      if (diaExistente) {
-        // Atualizar horários do dia existente
-        novaDisp.horarios.forEach((novoHorario) => {
-          const horarioExistente = diaExistente.horarios.find(
-            (horario) =>
-              horario.inicio === novoHorario.inicio && horario.fim === novoHorario.fim,
+                paciente: novoHorario.paciente
+                  ? new Types.ObjectId(novoHorario.paciente)
+                  : null,
+              };
+            }),
           );
-
-          if (horarioExistente) {
-            // Atualizar dados do horário existente
-            horarioExistente.duracao = novoHorario.duracao;
-            horarioExistente.status = novoHorario.status ?? horarioExistente.status; // Substituição de reservado por status
-            horarioExistente.paciente = novoHorario.paciente ?? horarioExistente.paciente;
-          } else {
-            // Adicionar novo horário ao dia existente
-            diaExistente.horarios.push({
-              _id: new Types.ObjectId(),
-              ...novoHorario,
-              status: novoHorario.status ?? 'disponivel', // Define um status padrão
-              paciente: novoHorario.paciente ?? null,
-            });
-          }
-        });
-      } else {
-        // Adicionar um novo dia com horários
-        agendamento.disponibilidade.push({
-          dia: new Date(novaDisp.dia),
-          horarios: novaDisp.horarios.map((horario) => ({
-            _id: new Types.ObjectId(),
-            ...horario,
-            status: horario.status ?? 'disponivel', // Define um status padrão
-            paciente: horario.paciente ?? null,
-          })),
-        });
+        }
       }
-    });
-  }
+    }
   
+    // Salva o agendamento no banco
     await agendamento.save();
   
     return {
-      message: 'Agendamento atualizado com sucesso',
       agendamento,
+      message: 'Agendamento atualizado com sucesso',
     };
   }
   
-  
-  
+  // Atualizar agendamento por _id (sem Google Calendar)
+  // async atualizarAgendamentoPorId(id: string, updateData: Partial<CreateAgendamentoDto>) {
+  //   const {
+  //     titulo,
+  //     descricao,
+  //     formatoConsulta,
+  //     disponibilidade,
+  //   } = updateData;
 
-  async deletarAgendamento(googleCalendarId: string, accessToken: string) {
-    // Deletar evento no Google Calendar
-    await this.calendarService.deleteEvent(googleCalendarId, accessToken);
+  //   // Buscar agendamento pelo ID
+  //   const agendamento = await this.agendamentoModel.findById(id).exec();
+  //   if (!agendamento) {
+  //     throw new NotFoundException('Agendamento não encontrado');
+  //   }
 
-    // Deletar agendamento no backend
-    const agendamento = await this.agendamentoModel
-      .findOne({ googleCalendarId })
-      .exec();
-    if (!agendamento) {
-      throw new Error('Agendamento não encontrado');
-    }
+  //   // Atualizar apenas os campos fornecidos
+  //   if (titulo) agendamento.titulo = titulo;
+  //   if (descricao) agendamento.descricao = descricao;
 
-    await this.agendamentoModel.findOneAndDelete({ googleCalendarId }).exec();
+  //   if (formatoConsulta) agendamento.formatoConsulta = formatoConsulta;
 
-    return { message: 'Agendamento deletado com sucesso' };
-  }
+  //   // Atualizar disponibilidade, caso fornecida
+  //  // Atualizar disponibilidade, caso fornecida
+  // if (disponibilidade && disponibilidade.length > 0) {
+  //   disponibilidade.forEach((novaDisp) => {
+  //     const diaExistente = agendamento.disponibilidade.find(
+  //       (disp) => disp.dia.toISOString() === new Date(novaDisp.dia).toISOString(),
+  //     );
+
+  //     if (diaExistente) {
+  //       // Atualizar horários do dia existente
+  //       novaDisp.horarios.forEach((novoHorario) => {
+  //         const horarioExistente = diaExistente.horarios.find(
+  //           (horario) =>
+  //             horario.inicio === novoHorario.inicio && horario.fim === novoHorario.fim,
+  //         );
+
+  //         if (horarioExistente) {
+  //           // Atualizar dados do horário existente
+  //           horarioExistente.duracao = novoHorario.duracao;
+  //           horarioExistente.status = novoHorario.status ?? horarioExistente.status; // Substituição de reservado por status
+  //           horarioExistente.paciente = novoHorario.paciente ?? horarioExistente.paciente;
+  //         } else {
+  //           // Adicionar novo horário ao dia existente
+  //           diaExistente.horarios.push({
+  //             _id: new Types.ObjectId(),
+  //             ...novoHorario,
+  //             status: novoHorario.status ?? 'disponivel', // Define um status padrão
+  //             paciente: novoHorario.paciente ?? null,
+  //           });
+  //         }
+  //       });
+  //     } else {
+  //       // Adicionar um novo dia com horários
+  //       agendamento.disponibilidade.push({
+  //         dia: new Date(novaDisp.dia),
+  //         horarios: novaDisp.horarios.map((horario) => ({
+  //           _id: new Types.ObjectId(),
+  //           ...horario,
+  //           status: horario.status ?? 'disponivel', // Define um status padrão
+  //           paciente: horario.paciente ?? null,
+  //         })),
+  //       });
+  //     }
+  //   });
+  // }
+
+  //   await agendamento.save();
+
+  //   return {
+  //     message: 'Agendamento atualizado com sucesso',
+  //     agendamento,
+  //   };
+  // }
+
+  // async deletarAgendamento(googleCalendarId: string, accessToken: string) {
+  //   // Deletar evento no Google Calendar
+  //   await this.calendarService.deleteEvent(googleCalendarId, accessToken);
+
+  //   // Deletar agendamento no backend
+  //   const agendamento = await this.agendamentoModel
+  //     .findOne({ googleCalendarId })
+  //     .exec();
+  //   if (!agendamento) {
+  //     throw new Error('Agendamento não encontrado');
+  //   }
+
+  //   await this.agendamentoModel.findOneAndDelete({ googleCalendarId }).exec();
+
+  //   return { message: 'Agendamento deletado com sucesso' };
+  // }
 
   // deletar por id
-
-  async deletarAgendamentoPorId(id: string) {
+  async deletarAgendamentoPorId(
+    id: string,
+    accessToken: string,
+  ): Promise<{ message: string }> {
+    // Busca o agendamento no backend
     const agendamento = await this.agendamentoModel.findById(id).exec();
     if (!agendamento) {
       throw new NotFoundException('Agendamento não encontrado');
     }
 
-    // Deletar agendamento no backend (não toca no Google Calendar)
+    for (const disponibilidade of agendamento.disponibilidade) {
+      for (const horario of disponibilidade.horarios) {
+        if (horario.googleCalendarId) {
+          console.log(
+            `Deletando evento com Google Calendar ID: ${horario.googleCalendarId}`,
+          );
+          try {
+            await this.calendarService.deleteEvent(
+              horario.googleCalendarId,
+              accessToken,
+            );
+          } catch (error) {
+            console.error(
+              `Erro ao deletar evento do Google Calendar com ID ${horario.googleCalendarId}:`,
+              error.message,
+            );
+          }
+        } else {
+          console.warn(
+            `Horário sem Google Calendar ID: ${JSON.stringify(horario)}`,
+          );
+        }
+      }
+    }
+
+    // Deleta o agendamento no backend
     await this.agendamentoModel.findByIdAndDelete(id).exec();
 
-    return { message: 'Agendamento deletado com sucesso' };
+    return {
+      message:
+        'Agendamento deletado com sucesso no Google Calendar e no backend',
+    };
   }
 
   // Filtrar agendamentos por título e/ou data

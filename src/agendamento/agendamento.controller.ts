@@ -49,36 +49,36 @@ async create(
 
   //deletar pelo _id do evento
   @Delete(':id')
-//@UseGuards(AuthGuard('jwt')) // Protege a rota com autenticação JWT
-async deletarAgendamentoPorId(
-  @Param('id') id: string,
-  @Req() req: any,
-) {
-  const token = req.cookies?.authToken || req.headers.authorization?.split(' ')[1];
-  if (!token) {
-    throw new Error('Token de autenticação não encontrado');
-  }
-
-  return this.agendamentoService.deletarAgendamentoPorId(id);
-}
-
-
-
-@Delete(':googleCalendarId')
-  //@UseGuards(AuthGuard('jwt')) // Protegendo a rota com JWT AuthGuard
-  async deletarAgendamento(
-    @Param('googleCalendarId') googleCalendarId: string,
-    @Headers('authorization') authorization: string,
-  ) {
-    // Extrair o token do header
-    const accessToken = authorization?.split(' ')[1];
+  async deletarAgendamentoPorId(
+    @Param('id') id: string,
+    @Headers('authorization') authorization: string, // Recebe o token do header
+  ): Promise<{ message: string }> {
+    const accessToken = authorization?.split(' ')[1]; // Extrai o token do header
     if (!accessToken) {
-      throw new Error('Token de autenticação não encontrado');
+      throw new Error('Access token não fornecido');
     }
-
-    // Chamando o serviço para deletar o agendamento
-    return this.agendamentoService.deletarAgendamento(googleCalendarId, accessToken);
+  
+    return this.agendamentoService.deletarAgendamentoPorId(id, accessToken);
   }
+  
+
+
+
+// @Delete(':googleCalendarId')
+//   //@UseGuards(AuthGuard('jwt')) // Protegendo a rota com JWT AuthGuard
+//   async deletarAgendamento(
+//     @Param('googleCalendarId') googleCalendarId: string,
+//     @Headers('authorization') authorization: string,
+//   ) {
+//     // Extrair o token do header
+//     const accessToken = authorization?.split(' ')[1];
+//     if (!accessToken) {
+//       throw new Error('Token de autenticação não encontrado');
+//     }
+
+//     // Chamando o serviço para deletar o agendamento
+//     return this.agendamentoService.deletarAgendamento(googleCalendarId, accessToken);
+//   }
   
 
   
@@ -122,30 +122,30 @@ async deletarAgendamentoPorId(
 
   //atualizar agendamento no calendar e no banco
 
-  @Put('calendar/event/:googleCalendarId')
+  @Put('calendar/event/:Id')
   async updateEvent(
-    @Param('googleCalendarId') googleCalendarId: string,
-    @Body() updateData: CreateAgendamentoDto,  // Atualiza o Google Calendar e o Banco de Dados
-    @Req() req: any  // Para capturar o accessToken
+    @Param('id') id: string, // Altere para `id`
+    @Body() updateData: CreateAgendamentoDto,
+    @Req() req: any
   ) {
-    const accessToken = req.headers.authorization.split(' ')[1];  // Captura o accessToken do header
-    return this.agendamentoService.atualizarAgendamento(googleCalendarId, updateData, accessToken);
+    const accessToken = req.headers.authorization.split(' ')[1];
+    return this.agendamentoService.atualizarAgendamento(id, updateData, accessToken); // Passe `id`
   }
   
 
-  @Patch(':id')
-async atualizarAgendamentoPorId(
-  @Param('id') id: string,
-  @Body() updateAgendamentoDto: CreateAgendamentoDto,
-  @Req() req: any,
-) {
-  const accessToken = req.cookies?.authToken || req.headers.authorization?.split(' ')[1];
-  if (!accessToken) {
-    throw new Error('Token de autenticação não encontrado');
-  }
+//   @Patch(':id')
+// async atualizarAgendamentoPorId(
+//   @Param('id') id: string,
+//   @Body() updateAgendamentoDto: CreateAgendamentoDto,
+//   @Req() req: any,
+// ) {
+//   const accessToken = req.cookies?.authToken || req.headers.authorization?.split(' ')[1];
+//   if (!accessToken) {
+//     throw new Error('Token de autenticação não encontrado');
+//   }
 
-  return this.agendamentoService.atualizarAgendamentoPorId(id, updateAgendamentoDto);
-}
+//   return this.agendamentoService.atualizarAgendamento(id, updateAgendamentoDto);
+// }
 
   
   
