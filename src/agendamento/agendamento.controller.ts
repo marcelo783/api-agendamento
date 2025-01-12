@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Patch, UseGuards, Req, Query, Put, Delete, UnauthorizedException, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Param, Patch, UseGuards, Req, Query, Put, Delete, UnauthorizedException, Headers, Body } from '@nestjs/common';
 import { AgendamentoService } from './agendamento.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { Agendamento } from './agendamento.schema';
@@ -111,13 +111,21 @@ async create(
   }
   
 
-  @Patch('atualizar/status/:status/agendamento/:agendamentoId')
-  async updateStatus(
-    @Param('status') status: string,
-    @Param('agendamentoId') agendamentoId: string
-  ): Promise<any> {
-    return this.agendamentoService.updateStatusAgendamentos(status, agendamentoId);
-  }
+  @Patch(':agendamentoId/horarios/:horarioId/status')
+async updateStatus(
+  @Param('agendamentoId') agendamentoId: string,
+  @Param('horarioId') horarioId: string,
+  @Body('status') status: string,
+  @Headers('Authorization') accessToken: string,
+): Promise<any> {
+  return this.agendamentoService.updateStatusAgendamentos(
+    agendamentoId,
+    horarioId,
+    status,
+    accessToken,
+  );
+}
+
 
 
   //atualizar agendamento no calendar e no banco
