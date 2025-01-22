@@ -121,7 +121,7 @@ export class AgendamentoService implements OnModuleInit {
   async updateStatusAgendamentos(
     agendamentoId: string,
     horarioId: string,
-    status: string,
+    novoStatus: string,
     accessToken: string,
   ): Promise<any> {
     // Buscar o agendamento pelo ID
@@ -130,7 +130,7 @@ export class AgendamentoService implements OnModuleInit {
       throw new BadRequestException('Agendamento não encontrado');
     }
   
-    // Encontrar o horário específico pelo ID
+    // Encontrar a disponibilidade e o horário específicos
     const disponibilidade = agendamento.disponibilidade.find((disp) =>
       disp.horarios.some((hor) => hor._id.toString() === horarioId),
     );
@@ -147,18 +147,72 @@ export class AgendamentoService implements OnModuleInit {
       throw new BadRequestException('Horário não encontrado');
     }
   
-    // Atualizar o status do horário
-    horario.status = status;
+    // Atualizar o status do horário se ele for diferente do atual
+    if (horario.status !== novoStatus) {
+      horario.status = novoStatus;
+    }
+  
+    // Recalcular os contadores de status baseado no estado atual dos horários
+    const statusContador = {
+      concluido: 0,
+      cancelado: 0,
+      ausente: 0,
+      expirado: 0,
+    };
+  
+    for (const disp of agendamento.disponibilidade) {
+      for (const hor of disp.horarios) {
+        if (hor.status in statusContador) {
+          statusContador[hor.status as keyof typeof statusContador]++;
+        }
+      }
+    }
+  
+    // Atualizar o statusContador no agendamento
+    agendamento.statusContador = statusContador;
   
     // Salvar as alterações no banco de dados
     await agendamento.save();
   
     this.logger.log(
-      `Status do horário ${horarioId} atualizado para ${status}`,
+      `Status do horário ${horarioId} atualizado para ${novoStatus}`,
     );
   
     return agendamento;
   }
+
+  //contador geral
+  
+  async calcularContadorGeral(): Promise<{
+    concluido: number;
+    cancelado: number;
+    ausente: number;
+    expirado: number;
+  }> {
+    // Inicializa os contadores gerais
+    const contadorGeral = {
+      concluido: 0,
+      cancelado: 0,
+      ausente: 0,
+      expirado: 0,
+    };
+  
+    // Recupera todos os agendamentos do banco
+    const agendamentos = await this.agendamentoModel.find().exec();
+  
+    // Itera sobre cada agendamento e soma os valores do statusContador
+    for (const agendamento of agendamentos) {
+      contadorGeral.concluido += agendamento.statusContador?.concluido || 0;
+      contadorGeral.cancelado += agendamento.statusContador?.cancelado || 0;
+      contadorGeral.ausente += agendamento.statusContador?.ausente || 0;
+      contadorGeral.expirado += agendamento.statusContador?.expirado || 0;
+    }
+  
+    // Retorna o contador geral
+    return contadorGeral;
+  }
+  
+  
   
   
 

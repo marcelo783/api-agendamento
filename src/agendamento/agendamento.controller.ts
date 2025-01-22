@@ -10,6 +10,15 @@ import { AuthGuard } from '@nestjs/passport';
 export class AgendamentoController {
   constructor(private readonly agendamentoService: AgendamentoService) {}
 
+  @Get('contador-geral')
+  async obterContadorGeral(): Promise<{
+    concluido: number;
+    cancelado: number;
+    ausente: number;
+    expirado: number;
+  }> {
+    return this.agendamentoService.calcularContadorGeral();
+  }
 
   @Get(':id')
 async findById(
@@ -97,6 +106,9 @@ async create(
     return this.agendamentoService.getDisponibilidade(psicologoId);
   }
 
+
+
+
   @Patch('agendar')
   async confirmarAgendamento(
     @Body() createAgendamentoDto: CreateAgendamentoDto,
@@ -115,13 +127,13 @@ async create(
 async updateStatus(
   @Param('agendamentoId') agendamentoId: string,
   @Param('horarioId') horarioId: string,
-  @Body('status') status: string,
+  @Body('status') novoStatus: string,
   @Headers('Authorization') accessToken: string,
 ): Promise<any> {
   return this.agendamentoService.updateStatusAgendamentos(
     agendamentoId,
     horarioId,
-    status,
+    novoStatus,
     accessToken,
   );
 }

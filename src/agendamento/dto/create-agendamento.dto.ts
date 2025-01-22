@@ -47,6 +47,18 @@ class DisponibilidadeDto {
 }
 
 export class CreateAgendamentoDto {
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => Object)
+  statusContador?: {
+    concluido: number;
+    cancelado: number;
+    ausente: number;
+    expirado: number;
+  };
+
+  
   @IsNotEmpty()
   @IsString()
   pacienteNome: string;

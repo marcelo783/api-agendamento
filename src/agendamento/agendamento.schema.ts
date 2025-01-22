@@ -31,6 +31,23 @@ export class Agendamento {
   repete: boolean;
 
   @Prop({
+    type: Object,
+    default: {
+      concluido: 0,
+      cancelado: 0,
+      ausente: 0,
+      expirado: 0,
+    },
+  })
+  statusContador: {
+    concluido: number;
+    cancelado: number;
+    ausente: number;
+    expirado: number;
+  };
+
+  
+  @Prop({
     type: [
       {
         dia: { type: Date, required: true },
@@ -57,7 +74,7 @@ export class Agendamento {
     dia: Date;
     horarios: Array<{
       _id: Types.ObjectId;
-     status: String;
+     status: string;
       inicio: string;
       fim: string;
       googleCalendarId?: string;
