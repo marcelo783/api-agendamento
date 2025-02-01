@@ -1,80 +1,72 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { OAuth2Client } from 'google-auth-library';
-import { google } from 'googleapis';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PsicologoDocument } from '../psicologo/psicologo.schema';
 
 @Injectable()
 export class AuthService {
-  private accessToken: string;
-  private oAuth2Client: OAuth2Client;
-
   constructor(
     private readonly jwtService: JwtService,
     @InjectModel('Psicologo') private psicologoModel: Model<PsicologoDocument>,
-  ) {
-    this.oAuth2Client = new google.auth.OAuth2(
-      process.env.GOOGLE_CLIENT_ID,
-      process.env.GOOGLE_CLIENT_SECRET,
-      process.env.GOOGLE_CALLBACK_URL
-    );
+  ) {}
+
+  
+  // Gera accessToken e refreshToken
+  async gerarTokens(email: string) {
+    const accessToken = this.jwtService.sign({ email }, { secret: process.env.JWT_SECRET, expiresIn: '30m' });
+    const refreshToken = this.jwtService.sign({ email }, { secret: process.env.JWT_REFRESH_SECRET, expiresIn: '7d' });
+
+    return { accessToken, refreshToken };
   }
 
-  storeAccessToken(token: string) {
-    this.accessToken = token;
-  }
-
-  getAccessToken() {
-    return this.accessToken;
-  }
-
-  async isUserRegistered(email: string): Promise<boolean> {
-    const user = await this.psicologoModel.findOne({ email }).exec();
-    return !!user; // Retorna `true` se o usuário for encontrado, caso contrário, `false`
-  }
-
+  // Realiza o login e gera os tokens
   async login(user: any) {
     const psicologo = await this.psicologoModel.findOne({ email: user.email });
-
-    // Obtenha o accessToken armazenado previamente
-    const accessToken = this.getAccessToken();
-
+  
     if (!psicologo) {
-      // O usuário não está registrado. Gera um token JWT com um sub temporário
+      // O usuário não está registrado, então NÃO use um `_id` inexistente.
       const payload = {
         email: user.email,
-        sub: 'tempId',
+        sub: 'tempId',//  Garante que o sub não seja undefined
         firstName: user.firstName,
-        picture: user.picture, 
+        picture: user.picture,
       };
       const token = this.jwtService.sign(payload);
-      return { isRegistered: false, token, accessToken }; 
+      return { isRegistered: false, token, accessToken: user.accessToken, refreshToken: user.refreshToken };
     }
-
-    
+  
+    // Se o psicólogo existir, então pode usar o `_id`
     const payload = {
       email: psicologo.email,
       nome: psicologo.nome,
       especialidade: psicologo.especialidade,
       registroProfissional: psicologo.registroProfissional,
-      sub: psicologo._id,
-      firstName: user.firstName, 
+      sub: psicologo._id, //  Agora temos certeza que existe
+      firstName: user.firstName,
       picture: user.picture,
     };
+  
     const token = this.jwtService.sign(payload);
-
+  
     return {
       isRegistered: true,
       token,
-      accessToken, 
+      accessToken: user.accessToken,
+      refreshToken: user.refreshToken,
     };
   }
+  
 
-  async getTokensFromCode(code: string): Promise<any> {
-    const { tokens } = await this.oAuth2Client.getToken(code);
-    this.storeAccessToken(tokens.access_token);
-    return tokens;
+  // Reautenticação usando o refreshToken
+  async reautenticar(refreshToken: string) {
+    try {
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      });
+      return this.gerarTokens(payload.email);
+    } catch (error) {
+      throw new UnauthorizedException('Refresh token inválido ou expirado');
+    }
   }
 }
