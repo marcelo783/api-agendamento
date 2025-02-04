@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Patch, UseGuards, Req, Query, Put, Delete, UnauthorizedException, Headers, Body } from '@nestjs/common';
+import { Controller, Get, Post, Param, Patch, UseGuards, Req, Query, Put, Delete, UnauthorizedException, Headers, Body, BadRequestException } from '@nestjs/common';
 import { AgendamentoService } from './agendamento.service';
 import { CreateAgendamentoDto } from './dto/create-agendamento.dto';
 import { Agendamento } from './agendamento.schema';
@@ -29,17 +29,13 @@ async findById(
 
 
 
-@Post()
-async create(
-  @Body() createAgendamentoDto: Agendamento,
-  @Headers('Authorization') authorization: string // Extrai o token
-): Promise<Agendamento> {
-  const accessToken = authorization?.replace('Bearer ', ''); // Remove "Bearer "
-  if (!accessToken) {
-    throw new UnauthorizedException('Access token is missing.');
+  @Post()
+  async create(
+    @Body() createAgendamentoDto: Agendamento,
+   
+  ): Promise<Agendamento> {
+    return this.agendamentoService.create(createAgendamentoDto);
   }
-  return this.agendamentoService.create(createAgendamentoDto, accessToken);
-}
 
   //@Get()
   //async findAll(): Promise<Agendamento[]> {
@@ -110,18 +106,23 @@ async create(
 
 
   @Patch('agendar')
-  async confirmarAgendamento(
-    @Body() createAgendamentoDto: CreateAgendamentoDto,
-    @Req() req: any, // Captura a requisição para obter o accessToken
-  ): Promise<any> {
-    const accessToken = req.headers.authorization?.split(' ')[1]; // Captura o access token do header
+async confirmarAgendamento(
+  @Body() createAgendamentoDto: CreateAgendamentoDto,
+  @Req() req: any,
+): Promise<any> {
+  try {
+    const accessToken = req.headers.authorization?.split(' ')[1];
     if (!accessToken) {
       throw new Error('Access token não fornecido');
     }
-  
-    return this.agendamentoService.confirmarAgendamento(createAgendamentoDto, accessToken);
+
+    return await this.agendamentoService.confirmarAgendamento(createAgendamentoDto, accessToken);
+  } catch (error) {
+    console.error('Erro ao confirmar agendamento:', error);
+    throw new BadRequestException(error.message);
   }
-  
+}
+
 
   @Patch(':agendamentoId/horarios/:horarioId/status')
 async updateStatus(
