@@ -15,41 +15,46 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       clientSecret: configService.get<string>('GOOGLE_CLIENT_SECRET'),
       callbackURL: configService.get<string>('GOOGLE_CALLBACK_URL'),
       scope: ['email', 'profile', 'https://www.googleapis.com/auth/calendar'],
-      accessType: 'offline', // Necessário para obter o refreshToken
-      prompt: 'consent', // Força o consentimento para obter o refreshToken
+      accessType: 'offline',
+      prompt: 'consent',
+      passReqToCallback: true,
     });
   }
 
   async validate(
+    req: any,
     accessToken: string,
-    refreshToken: string,
+    refreshToken: string | undefined,  // 🔍 Verificar se o refreshToken está sendo enviado
     profile: any,
     done: VerifyCallback,
   ): Promise<any> {
+    console.log('AccessToken recebido:', accessToken);
+    console.log('RefreshToken recebido:', refreshToken || '❌ Não recebido');
 
-    console.log('AccessToken:', accessToken);
-  console.log('RefreshToken:', refreshToken);
-  console.log('Profile:', profile);
+    if (!refreshToken) {
+      // ⚠️ Se não houver refreshToken, você pode tentar buscá-lo no banco de dados
+      console.log('⚠️ Nenhum refreshToken recebido, verificando no banco de dados...');
+      const storedTokens = await this.authService.gerarTokens(profile.emails[0].value);
+      if (storedTokens) {
+        refreshToken = storedTokens.refreshToken;  // Reutilize o refreshToken salvo
+        console.log('🔄 Usando refreshToken armazenado:', refreshToken);
+      } else {
+        console.error('❌ Nenhum refreshToken disponível para o usuário.');
+      }
+    }
 
     const { name, emails, photos } = profile;
 
-    // Obter o usuário e os tokens
     const user = {
       email: emails[0].value,
       firstName: name.familyName,
       picture: photos[0].value,
       accessToken,
-      refreshToken,
+      refreshToken,  // Armazena o refresh token
     };
 
-    console.log('AccessToken:', user.accessToken);
-console.log('RefreshToken:', user.refreshToken);
-console.log('User:', user);
-
-    // Fazer login do usuário
+    // Gera o JWT e passa para o usuário
     const jwt = await this.authService.login(user);
-    Logger.log(jwt);
-
     done(null, { ...user, jwt });
   }
 }

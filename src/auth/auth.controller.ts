@@ -16,6 +16,7 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req, @Res() res: Response) {
+    console.log('🔍 req.user recebido do Google:', req.user);
     const user = req.user;
 
     // Faz o login e obtém os tokens
@@ -42,12 +43,19 @@ export class AuthController {
       maxAge: 30 * 60 * 1000, // 30 minutos
     });
 
-    res.cookie('refreshToken', loginResult.refreshToken, {
-      httpOnly: true,
-      secure: false,
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
-    });
+    console.log(' Refresh Token recebido no loginResult:', loginResult.refreshToken);
+
+if (!loginResult.refreshToken) {
+  console.error('❌ Erro: RefreshToken ausente. O Google pode não ter enviado.');
+} else {
+  console.log('✅ Salvando refreshToken no cookie...');
+  res.cookie('refreshToken', loginResult.refreshToken, {
+    httpOnly: true,
+    secure: false,
+    sameSite: 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
+  });
+}
 
     // Log dos cookies definidos
     console.log('🔍 Headers de resposta:', res.getHeaders()['set-cookie']);
