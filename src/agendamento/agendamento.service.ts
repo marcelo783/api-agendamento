@@ -219,6 +219,7 @@ export class AgendamentoService implements OnModuleInit {
     return agendamento;
   }
 
+  
   // Função confirmando o agendamento
   async confirmarAgendamento(
     agendamentoDto: CreateAgendamentoDto,
@@ -293,6 +294,7 @@ export class AgendamentoService implements OnModuleInit {
       message: 'Horário confirmado e evento criado no Google Calendar com sucesso!',
     };
   }
+
   
   
   async atualizarAgendamento(

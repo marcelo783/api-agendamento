@@ -106,23 +106,23 @@ async findById(
 
 
   @Patch('agendar')
-async confirmarAgendamento(
-  @Body() createAgendamentoDto: CreateAgendamentoDto,
-  @Req() req: any,
-): Promise<any> {
-  try {
-    const accessToken = req.headers.authorization?.split(' ')[1];
-    if (!accessToken) {
-      throw new Error('Access token não fornecido');
+  async confirmarAgendamento(
+    @Body() createAgendamentoDto: CreateAgendamentoDto,
+    @Req() req: any,
+  ): Promise<any> {
+    try {
+      const accessToken = req.headers.authorization?.split(' ')[1];
+      if (!accessToken) {
+        throw new Error('Access token não fornecido');
+      }
+  
+      return await this.agendamentoService.confirmarAgendamento(createAgendamentoDto, accessToken);
+    } catch (error) {
+      console.error('Erro ao confirmar agendamento:', error);
+      throw new BadRequestException(error.message);
     }
-
-    return await this.agendamentoService.confirmarAgendamento(createAgendamentoDto, accessToken);
-  } catch (error) {
-    console.error('Erro ao confirmar agendamento:', error);
-    throw new BadRequestException(error.message);
   }
-}
-
+  
 
   @Patch(':agendamentoId/horarios/:horarioId/status')
 async updateStatus(

@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
-import { ConfigService } from '@nestjs/config';
 import { Strategy, VerifyCallback } from 'passport-google-oauth20';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
+
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
@@ -11,12 +12,10 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     private authService: AuthService,
   ) {
     super({
-      clientID: configService.get<string>('GOOGLE_CLIENT_ID'),
-      clientSecret: configService.get<string>('GOOGLE_CLIENT_SECRET'),
+      clientID: configService.get<string>('GOOGLE_ID'),
+      clientSecret: configService.get<string>('GOOGLE_SECRET'),
       callbackURL: configService.get<string>('GOOGLE_CALLBACK_URL'),
       scope: ['email', 'profile', 'https://www.googleapis.com/auth/calendar'],
-      accessType: 'offline',
-      prompt: 'consent',
       passReqToCallback: true,
     });
   }
@@ -24,37 +23,32 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   async validate(
     req: any,
     accessToken: string,
-    refreshToken: string | undefined,  // 🔍 Verificar se o refreshToken está sendo enviado
+    refreshToken: string | undefined,
     profile: any,
     done: VerifyCallback,
   ): Promise<any> {
-    console.log('AccessToken recebido:', accessToken);
-    console.log('RefreshToken recebido:', refreshToken || '❌ Não recebido');
+    console.log("[GoogleStrategy] RefreshToken recebido do Google:", refreshToken);
 
     if (!refreshToken) {
-      // ⚠️ Se não houver refreshToken, você pode tentar buscá-lo no banco de dados
-      console.log('⚠️ Nenhum refreshToken recebido, verificando no banco de dados...');
-      const storedTokens = await this.authService.gerarTokens(profile.emails[0].value);
-      if (storedTokens) {
-        refreshToken = storedTokens.refreshToken;  // Reutilize o refreshToken salvo
-        console.log('🔄 Usando refreshToken armazenado:', refreshToken);
-      } else {
-        console.error('❌ Nenhum refreshToken disponível para o usuário.');
-      }
+      console.error('❌ Erro: Google não enviou um refreshToken. Verifique se a autenticação está correta.');
     }
 
-    const { name, emails, photos } = profile;
-
     const user = {
-      email: emails[0].value,
-      firstName: name.familyName,
-      picture: photos[0].value,
+      email: profile.emails[0].value,
+      firstName: profile.name.givenName,
+      lastName: profile.name.familyName,
+      picture: profile.photos[0].value,
       accessToken,
-      refreshToken,  // Armazena o refresh token
+      refreshToken, // ⭐ Aqui está o refreshToken do Google!
     };
 
-    // Gera o JWT e passa para o usuário
     const jwt = await this.authService.login(user);
-    done(null, { ...user, jwt });
+
+    // ⭐ Passe o refreshToken explicitamente:
+    done(null, {
+      ...user,
+      jwt,
+      refreshToken, // Garanta que o refreshToken está aqui!
+    });
   }
 }
