@@ -63,26 +63,31 @@ export class AuthService {
   }
   async renewAccessToken(refreshToken: string) {
     try {
-      const requestData = {
+      console.log("🔄 Tentando renovar Access Token com refreshToken:", refreshToken);
+  
+      const response = await axios.post('https://oauth2.googleapis.com/token', new URLSearchParams({
         client_id: process.env.GOOGLE_ID,
         client_secret: process.env.GOOGLE_SECRET,
-        refresh_token: decodeURIComponent(refreshToken),
+        refresh_token: refreshToken,
         grant_type: 'refresh_token',
-      };
+      }), {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+      });
   
-      console.log('Dados enviados ao Google:', requestData);
+      if (!response.data.access_token) {
+        throw new Error("❌ Erro: Google não retornou um accessToken válido.");
+      }
   
-      const response = await axios.post('https://oauth2.googleapis.com/token', requestData);
-  
-      return {
-        accessToken: response.data.access_token,
-        expiresIn: response.data.expires_in,
-      };
+      console.log("✅ Novo accessToken gerado:", response.data.access_token);
+      return { accessToken: response.data.access_token };
     } catch (error) {
-      console.error('❌nt Erro ao renovar access token:', error.response?.data || error.message);
-      throw new Error(' nt Erro ao renovar access token: ' + (error.response?.data || error.message));
+      console.error("❌ Erro ao renovar access token:", error.response?.data || error.message);
+      throw new UnauthorizedException("Erro ao renovar access token.");
     }
   }
+  
 
   // Reautenticação usando o refreshToken para renovar accessToken e refreshToken
   async reautenticar(refreshToken: string) {

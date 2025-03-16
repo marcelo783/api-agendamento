@@ -56,7 +56,7 @@ export class AuthController {
     });
   
     res.cookie('refreshToken', user.refreshToken, {
-      httpOnly: true,  // O refreshToken não deve ser acessível no frontend
+      httpOnly: false,  // O refreshToken não deve ser acessível no frontend
       secure: false,
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 dias
@@ -69,18 +69,22 @@ export class AuthController {
   }
 
   @Post('refresh')
-async refreshAccessToken(@Body() body: { refreshToken: string }, @Res() res: Response) {
-  const { refreshToken } = body; // Pega o refreshToken do corpo da requisição
+async refreshAccessToken(@Req() req, @Res() res: Response) {
+  console.log("🔍 Cookies recebidos:", req.cookies);
+  const refreshToken = req.cookies?.refreshToken;
 
   if (!refreshToken) {
+    console.error("❌ Erro: RefreshToken não recebido!");
     return res.status(401).json({ message: 'Refresh token ausente.' });
   }
+
+  console.log("✅ RefreshToken recebido com sucesso:", refreshToken);
 
   try {
     const newAccessToken = await this.authService.renewAccessToken(refreshToken);
     res.cookie('accessToken', newAccessToken.accessToken, {
       httpOnly: true,
-      secure: false, // Use 'true' em produção com HTTPS
+      secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 30 * 60 * 1000, // 30 minutos
     });
@@ -91,4 +95,7 @@ async refreshAccessToken(@Body() body: { refreshToken: string }, @Res() res: Res
     return res.status(401).json({ message: 'Erro ao renovar access token.' });
   }
 }
+
+
+  
 }
